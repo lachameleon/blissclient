@@ -69,7 +69,6 @@ public class MeteorClient implements ClientModInitializer {
         String versionString = MOD_META.getVersion().getFriendlyString();
         if (versionString.contains("-")) versionString = versionString.split("-")[0];
 
-        // When building and running through IntelliJ and not Gradle it doesn't replace the version so just use a dummy
         if (versionString.equals("${version}")) versionString = "0.0.0";
 
         VERSION = new Version(versionString);
@@ -83,7 +82,6 @@ public class MeteorClient implements ClientModInitializer {
             return;
         }
 
-        // Global minecraft client accessor
         mc = MinecraftClient.getInstance();
 
         if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
@@ -93,17 +91,14 @@ public class MeteorClient implements ClientModInitializer {
 
         LOG.info("Initializing {}", NAME);
 
-        // Pre-load
         if (!FOLDER.exists()) {
             FOLDER.getParentFile().mkdirs();
             FOLDER.mkdir();
             Systems.addPreLoadTask(() -> Modules.get().get(DiscordPresence.class).toggle());
         }
 
-        // Register addons
         AddonManager.init();
 
-        // Register event handlers
         AddonManager.ADDONS.forEach(addon -> {
             try {
                 EVENT_BUS.registerLambdaFactory(addon.getPackage(), (lookupInMethod, klass) -> (MethodHandles.Lookup) lookupInMethod.invoke(null, klass, MethodHandles.lookup()));
@@ -112,34 +107,29 @@ public class MeteorClient implements ClientModInitializer {
             }
         });
 
-        // Register init classes
         ReflectInit.registerPackages();
 
-        // Pre init
         ReflectInit.init(PreInit.class);
 
-        // Register module categories
         Categories.init();
 
-        // Load systems
         Systems.init();
 
-        // Subscribe after systems are loaded
         EVENT_BUS.subscribe(this);
 
-        // Initialise addons
         AddonManager.ADDONS.forEach(MeteorAddon::onInitialize);
 
-        // Sort modules after addons have added their own
+        // Sort modules after addons add theirs
         Modules.get().sortModules();
 
-        // Load configs
+        // Build hidden list after modules exist
+        Config.get().initHiddenModules();
+
+        // Now load configs
         Systems.load();
 
-        // Post init
         ReflectInit.init(PostInit.class);
 
-        // Save on shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             OnlinePlayers.leave();
             Systems.save();
@@ -173,8 +163,6 @@ public class MeteorClient implements ClientModInitializer {
         else if (Utils.canOpenGui()) Tabs.get().getFirst().openScreen(GuiThemes.get());
     }
 
-    // Hide HUD
-
     private boolean wasWidgetScreen, wasHudHiddenRoot;
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -182,8 +170,6 @@ public class MeteorClient implements ClientModInitializer {
         if (event.screen instanceof WidgetScreen) {
             if (!wasWidgetScreen) wasHudHiddenRoot = mc.options.hudHidden;
             if (GuiThemes.get().hideHUD() || wasHudHiddenRoot) {
-                // Always show the MC HUD in the HUD editor screen since people like
-                // to align some items with the hotbar or chat
                 mc.options.hudHidden = !(event.screen instanceof HudEditorScreen);
             }
         } else {

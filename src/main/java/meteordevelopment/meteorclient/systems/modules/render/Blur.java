@@ -122,6 +122,7 @@ public class Blur extends Module {
 
     public Blur() {
         super(Categories.Render, "blur", "Blurs background when in GUI screens.");
+        runInMainMenu = true;
 
         // Initialize fbos for the first time
         for (int i = 0; i < fbos.length; i++) {
@@ -144,6 +145,9 @@ public class Blur extends Module {
         }));
 
         MeteorClient.EVENT_BUS.subscribe(new ConsumerListener<>(RenderAfterWorldEvent.class, event -> onRenderAfterWorld()));
+
+        // Enabled by default for a Bliss look on first launch.
+        toggle();
     }
 
     private GpuTextureView createFbo(int i) {

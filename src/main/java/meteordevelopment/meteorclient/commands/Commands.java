@@ -11,6 +11,7 @@ import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.commands.commands.*;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.pathing.PathManagers;
+import meteordevelopment.meteorclient.systems.config.Config;
 import meteordevelopment.meteorclient.utils.PostInit;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
@@ -74,6 +75,9 @@ public class Commands {
     }
 
     public static void add(Command command) {
+        // Skip registration if command is hidden in config
+        if (Config.get().hiddenCommands.get().contains(command.getName())) return;
+
         COMMANDS.removeIf(existing -> existing.getName().equals(command.getName()));
         COMMANDS.add(command);
     }
@@ -116,7 +120,9 @@ public class Commands {
 
         DISPATCHER = new CommandDispatcher<>();
         for (Command command : COMMANDS) {
-            command.registerTo(DISPATCHER);
+            if (!Config.get().hiddenCommands.get().contains(command.getName())) {
+                command.registerTo(DISPATCHER);
+            }
         }
     }
 }

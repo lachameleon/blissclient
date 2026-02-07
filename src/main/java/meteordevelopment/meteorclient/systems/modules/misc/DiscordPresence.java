@@ -54,7 +54,7 @@ public class DiscordPresence extends Module {
     private final Setting<List<String>> line1Strings = sgLine1.add(new StringListSetting.Builder()
         .name("line-1-messages")
         .description("Messages used for the first line.")
-        .defaultValue("{player}", "{server}")
+        .defaultValue("Bliss Client", "{player}", "{server}")
         .onChanged(strings -> recompileLine1())
         .renderer(StarscriptTextBoxRenderer.class)
         .build()
@@ -81,7 +81,7 @@ public class DiscordPresence extends Module {
     private final Setting<List<String>> line2Strings = sgLine2.add(new StringListSetting.Builder()
         .name("line-2-messages")
         .description("Messages used for the second line.")
-        .defaultValue("Meteor on Crack!", "{round(server.tps, 1)} TPS", "Playing on {server.difficulty} difficulty.", "{server.player_count} Players online")
+        .defaultValue("Bliss Client | {round(server.tps, 1)} TPS", "Playing on {server.difficulty} difficulty.", "{server.player_count} players online")
         .onChanged(strings -> recompileLine2())
         .renderer(StarscriptTextBoxRenderer.class)
         .build()
@@ -150,7 +150,7 @@ public class DiscordPresence extends Module {
 
         rpc.setStart(System.currentTimeMillis() / 1000L);
 
-        String largeText = "%s %s".formatted(MeteorClient.NAME, MeteorClient.VERSION);
+        String largeText = "Bliss Client %s".formatted(MeteorClient.VERSION);
         if (!MeteorClient.BUILD_NUMBER.isEmpty()) largeText += " Build: " + MeteorClient.BUILD_NUMBER;
         rpc.setLargeImage("meteor_client", largeText);
 

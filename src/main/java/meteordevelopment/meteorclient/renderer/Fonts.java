@@ -51,7 +51,9 @@ public class Fonts {
 
         MeteorClient.LOG.info("Found {} font families.", FONT_FAMILIES.size());
 
-        DEFAULT_FONT_FAMILY = FontUtils.getBuiltinFontInfo(BUILTIN_FONTS[1]).family();
+        // Prefer Lexend if available, otherwise fall back to the existing Comfortaa default.
+        FontFamily lexend = findFirstFamilyContaining("lexend");
+        DEFAULT_FONT_FAMILY = lexend != null ? lexend.getName() : FontUtils.getBuiltinFontInfo(BUILTIN_FONTS[1]).family();
         DEFAULT_FONT = getFamily(DEFAULT_FONT_FAMILY).get(FontInfo.Type.Regular);
 
         Config config = Config.get();
@@ -80,6 +82,15 @@ public class Fonts {
         if (mc.currentScreen instanceof WidgetScreen && Config.get().customFont.get()) {
             ((WidgetScreen) mc.currentScreen).invalidate();
         }
+    }
+
+    private static FontFamily findFirstFamilyContaining(String needle) {
+        for (FontFamily family : FONT_FAMILIES) {
+            if (family.getName().toLowerCase().contains(needle.toLowerCase())) {
+                return family;
+            }
+        }
+        return null;
     }
 
     public static FontFamily getFamily(String name) {

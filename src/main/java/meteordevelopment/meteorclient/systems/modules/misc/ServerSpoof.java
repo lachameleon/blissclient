@@ -44,7 +44,7 @@ public class ServerSpoof extends Module {
     private final Setting<String> brand = sgGeneral.add(new StringSetting.Builder()
         .name("brand")
         .description("Specify the brand that will be send to the server.")
-        .defaultValue("vanilla")
+        .defaultValue("bliss-client")
         .visible(spoofBrand::get)
         .build()
     );

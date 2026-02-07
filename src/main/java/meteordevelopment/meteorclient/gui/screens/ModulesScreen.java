@@ -88,6 +88,7 @@ public class ModulesScreen extends TabScreen {
 
                 int count = 0;
                 for (Module module : modules) {
+                    if (Config.get().hiddenModules.get().contains(module)) continue;
                     if (count >= Config.get().moduleSearchCount.get() || count >= modules.size()) break;
                     section.add(theme.module(module)).expandX();
                     count++;
@@ -103,6 +104,7 @@ public class ModulesScreen extends TabScreen {
 
                 int count = 0;
                 for (Module module : modules) {
+                    if (Config.get().hiddenModules.get().contains(module)) continue;
                     if (count >= Config.get().moduleSearchCount.get() || count >= modules.size()) break;
                     section.add(theme.module(module)).expandX();
                     count++;
@@ -240,11 +242,11 @@ public class ModulesScreen extends TabScreen {
 
         @Override
         protected void onCalculateWidgetPositions() {
-            double pad = theme.scale(4);
-            double h = theme.scale(40);
+            double pad = theme.scale(8);
+            double h = theme.scale(48);
 
             double x = this.x + pad;
-            double y = this.y;
+            double y = this.y + pad * 2;
 
             for (Cell<?> cell : cells) {
                 double windowWidth = getWindowWidth();
