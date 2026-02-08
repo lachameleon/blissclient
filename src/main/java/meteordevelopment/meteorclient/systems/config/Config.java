@@ -1,32 +1,84 @@
 package meteordevelopment.meteorclient.systems.config;
 
-import meteordevelopment.meteorclient.systems.modules.combat.*;
-import meteordevelopment.meteorclient.systems.modules.movement.*;
-import meteordevelopment.meteorclient.systems.modules.movement.elytrafly.ElytraFly;
-import meteordevelopment.meteorclient.systems.modules.movement.speed.Speed;
-import meteordevelopment.meteorclient.systems.modules.render.*;
-import meteordevelopment.meteorclient.systems.modules.render.marker.Marker;
-import meteordevelopment.meteorclient.systems.modules.world.*;
-import meteordevelopment.meteorclient.systems.modules.player.*;
-import meteordevelopment.meteorclient.systems.modules.misc.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import meteordevelopment.meteorclient.MeteorClient;
+import static meteordevelopment.meteorclient.MeteorClient.mc;
 import meteordevelopment.meteorclient.renderer.Fonts;
 import meteordevelopment.meteorclient.renderer.text.FontFace;
-import meteordevelopment.meteorclient.settings.*;
+import meteordevelopment.meteorclient.settings.BoolSetting;
+import meteordevelopment.meteorclient.settings.ColorSetting;
+import meteordevelopment.meteorclient.settings.DoubleSetting;
+import meteordevelopment.meteorclient.settings.FontFaceSetting;
+import meteordevelopment.meteorclient.settings.IntSetting;
+import meteordevelopment.meteorclient.settings.ModuleListSetting;
+import meteordevelopment.meteorclient.settings.Setting;
+import meteordevelopment.meteorclient.settings.SettingGroup;
+import meteordevelopment.meteorclient.settings.Settings;
+import meteordevelopment.meteorclient.settings.StringListSetting;
+import meteordevelopment.meteorclient.settings.StringSetting;
 import meteordevelopment.meteorclient.systems.System;
 import meteordevelopment.meteorclient.systems.Systems;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
+import meteordevelopment.meteorclient.systems.modules.misc.BetterChat;
+import meteordevelopment.meteorclient.systems.modules.misc.DiscordPresence;
+import meteordevelopment.meteorclient.systems.modules.misc.InventoryTweaks;
+import meteordevelopment.meteorclient.systems.modules.misc.Notebot;
+import meteordevelopment.meteorclient.systems.modules.misc.Notifier;
+import meteordevelopment.meteorclient.systems.modules.misc.SoundBlocker;
+import meteordevelopment.meteorclient.systems.modules.movement.AutoWalk;
+import meteordevelopment.meteorclient.systems.modules.movement.AutoWasp;
+import meteordevelopment.meteorclient.systems.modules.movement.Sprint;
+import meteordevelopment.meteorclient.systems.modules.player.AntiAFK;
+import meteordevelopment.meteorclient.systems.modules.player.AutoEat;
+import meteordevelopment.meteorclient.systems.modules.player.AutoFish;
+import meteordevelopment.meteorclient.systems.modules.player.AutoGap;
+import meteordevelopment.meteorclient.systems.modules.player.AutoMend;
+import meteordevelopment.meteorclient.systems.modules.player.AutoReplenish;
+import meteordevelopment.meteorclient.systems.modules.player.AutoRespawn;
+import meteordevelopment.meteorclient.systems.modules.player.AutoTool;
+import meteordevelopment.meteorclient.systems.modules.player.BreakDelay;
+import meteordevelopment.meteorclient.systems.modules.player.ChestSwap;
+import meteordevelopment.meteorclient.systems.modules.player.EXPThrower;
+import meteordevelopment.meteorclient.systems.modules.player.LiquidInteract;
+import meteordevelopment.meteorclient.systems.modules.player.MiddleClickExtra;
+import meteordevelopment.meteorclient.systems.modules.player.NameProtect;
+import meteordevelopment.meteorclient.systems.modules.player.Portals;
+import meteordevelopment.meteorclient.systems.modules.render.BetterTooltips;
+import meteordevelopment.meteorclient.systems.modules.render.Blur;
+import meteordevelopment.meteorclient.systems.modules.render.BossStack;
+import meteordevelopment.meteorclient.systems.modules.render.CameraTweaks;
+import meteordevelopment.meteorclient.systems.modules.render.Fullbright;
+import meteordevelopment.meteorclient.systems.modules.render.HandView;
+import meteordevelopment.meteorclient.systems.modules.render.ItemHighlight;
+import meteordevelopment.meteorclient.systems.modules.render.ItemPhysics;
+import meteordevelopment.meteorclient.systems.modules.render.LightOverlay;
+import meteordevelopment.meteorclient.systems.modules.render.TimeChanger;
+import meteordevelopment.meteorclient.systems.modules.render.Zoom;
+import meteordevelopment.meteorclient.systems.modules.world.AutoBreed;
+import meteordevelopment.meteorclient.systems.modules.world.AutoBrewer;
+import meteordevelopment.meteorclient.systems.modules.world.AutoMount;
+import meteordevelopment.meteorclient.systems.modules.world.AutoNametag;
+import meteordevelopment.meteorclient.systems.modules.world.AutoShearer;
+import meteordevelopment.meteorclient.systems.modules.world.AutoSign;
+import meteordevelopment.meteorclient.systems.modules.world.AutoSmelter;
+import meteordevelopment.meteorclient.systems.modules.world.HighwayBuilder;
+import meteordevelopment.meteorclient.systems.modules.world.LiquidFiller;
+import meteordevelopment.meteorclient.systems.modules.world.NoGhostBlocks;
+import meteordevelopment.meteorclient.systems.modules.world.SpawnProofer;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
-
-import net.minecraft.nbt.*;
-
-import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
-
-import static meteordevelopment.meteorclient.MeteorClient.mc;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtString;
 
 public class Config extends System<Config> {
     public final Settings settings = new Settings();
@@ -111,7 +163,7 @@ public class Config extends System<Config> {
         .name("hidden-modules")
         .description("Modules hidden from the click GUI.")
         .defaultValue(new ArrayList<>())   // SAFE — filled later
-        .visible(() -> true)
+        .visible(() -> false)
         .build()
     );
 
@@ -127,8 +179,8 @@ public class Config extends System<Config> {
             // Player automation / QoL
             AntiAFK.class, AutoEat.class, AutoFish.class, AutoGap.class, AutoMend.class, AutoReplenish.class,
             AutoRespawn.class, AutoTool.class, BreakDelay.class, ChestSwap.class, EXPThrower.class,
-            LiquidInteract.class, MiddleClickExtra.class, Multitask.class, NameProtect.class, NoStatusEffects.class,
-            Portals.class, PotionSaver.class,
+            LiquidInteract.class, MiddleClickExtra.class, NameProtect.class,
+            Portals.class,
 
             // Render (cosmetic/info-lite)
             BetterTooltips.class, Blur.class, BossStack.class, CameraTweaks.class, Fullbright.class, HandView.class,
@@ -136,11 +188,14 @@ public class Config extends System<Config> {
 
             // World automation
             AutoBreed.class, AutoBrewer.class, AutoMount.class, AutoNametag.class, AutoShearer.class, AutoSign.class,
-            AutoSmelter.class, BuildHeight.class, EChestFarmer.class, HighwayBuilder.class, LiquidFiller.class,
+            AutoSmelter.class, HighwayBuilder.class, LiquidFiller.class,
             NoGhostBlocks.class, SpawnProofer.class,
 
+            // Movement exceptions
+            AutoWalk.class, Sprint.class, AutoWasp.class,
+
             // Misc utilities
-            AutoReconnect.class, BetterBeacons.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
+            AutoReconnect.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
             Notebot.class, Notifier.class, SoundBlocker.class
         );
 
@@ -151,10 +206,6 @@ public class Config extends System<Config> {
 
         hiddenModules.set(list);
     }
-
-    // ================================
-    // OTHER MODULE SETTINGS
-    // ================================
 
     public final Setting<Integer> moduleSearchCount = sgModules.add(new IntSetting.Builder()
         .name("module-search-count")
@@ -280,6 +331,7 @@ public class Config extends System<Config> {
         // If Modules were already initialized earlier, apply hiddenModules now
         if (Modules.get().getAll().size() > 0) {
             initHiddenModules();
+            this.save();
         }
     }
 
