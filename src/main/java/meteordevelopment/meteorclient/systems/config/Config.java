@@ -155,9 +155,14 @@ public class Config extends System<Config> {
         .build()
     );
 
-    // ================================
-    // FIXED HIDDEN MODULES (SAFE INITIALIZATION)
-    // ================================
+    public final Setting<Boolean> syncListSettingWidths = sgVisual.add(new BoolSetting.Builder()
+        .name("sync-list-setting-widths")
+        .description("Prevents the list setting screens from moving around as you add & remove elements.")
+        .defaultValue(false)
+        .build()
+    );
+
+    // Modules
 
     public final Setting<List<Module>> hiddenModules = sgModules.add(new ModuleListSetting.Builder()
         .name("hidden-modules")
