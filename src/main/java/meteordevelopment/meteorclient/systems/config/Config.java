@@ -104,6 +104,7 @@ public class Config extends System<Config> {
         .description("Custom font to use.")
         .visible(customFont::get)
         .onChanged(Fonts::load)
+        .defaultValue(Fonts.DEFAULT_FONT)
         .build()
     );
 
@@ -257,6 +258,7 @@ public class Config extends System<Config> {
         .name("hidden-commands")
         .description("Commands hidden from the help menu, autocomplete, and execution.")
         .defaultValue(List.of("bind", "toggle", "hclip", "vclip"))
+        .visible(() -> false)
         .build()
     );
 

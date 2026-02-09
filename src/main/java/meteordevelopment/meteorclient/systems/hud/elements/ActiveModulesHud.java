@@ -79,7 +79,7 @@ public class ActiveModulesHud extends HudElement {
     private final Setting<Alignment> alignment = sgGeneral.add(new EnumSetting.Builder<Alignment>()
         .name("alignment")
         .description("Horizontal alignment.")
-        .defaultValue(Alignment.Auto)
+        .defaultValue(Alignment.Left)
         .build()
     );
 
