@@ -14,6 +14,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -47,6 +48,7 @@ public class Proxy implements ISerializable<Proxy> {
         .name("address")
         .description("The ip address of the proxy.")
         .filter(Utils::ipFilter)
+        .visible(() -> !type.get().equals(ProxyType.OpenVPN))
         .build()
     );
 
@@ -57,6 +59,14 @@ public class Proxy implements ISerializable<Proxy> {
         .range(0, 65535)
         .sliderMax(65535)
         .noSlider()
+        .visible(() -> !type.get().equals(ProxyType.OpenVPN))
+        .build()
+    );
+
+    public Setting<String> configFile = sgGeneral.add(new StringSetting.Builder()
+        .name("config-file")
+        .description("Path to the OpenVPN configuration file (.ovpn).")
+        .visible(() -> type.get().equals(ProxyType.OpenVPN))
         .build()
     );
 
@@ -78,12 +88,52 @@ public class Proxy implements ISerializable<Proxy> {
     public Setting<String> password = sgOptional.add(new StringSetting.Builder()
         .name("password")
         .description("The password of the proxy.")
-        .visible(() -> type.get().equals(ProxyType.Socks5))
+        .visible(() -> type.get().equals(ProxyType.Socks5) || type.get().equals(ProxyType.OpenVPN))
         .build()
     );
 
     public Status status = Status.UNCHECKED;
     public long latency;
+
+    private Process openvpnProcess;
+
+    public void startOpenVPN() {
+        if (!type.get().equals(ProxyType.OpenVPN)) return;
+        String configPath = configFile.get();
+        if (configPath == null || configPath.isEmpty()) return;
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder("openvpn", configPath);
+            pb.redirectErrorStream(true);
+
+            // Handle authentication if username and password are provided
+            String username = this.username.get();
+            String password = this.password.get();
+            if (username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
+                // Create a temporary file for auth credentials
+                java.io.File authFile = java.io.File.createTempFile("openvpn_auth", ".txt");
+                authFile.deleteOnExit();
+                try (java.io.PrintWriter writer = new java.io.PrintWriter(authFile)) {
+                    writer.println(username);
+                    writer.println(password);
+                }
+                pb.command().add("--auth-user-pass");
+                pb.command().add(authFile.getAbsolutePath());
+            }
+
+            openvpnProcess = pb.start();
+            // TODO: handle output/logging
+        } catch (IOException e) {
+            // Handle error
+        }
+    }
+
+    public void stopOpenVPN() {
+        if (openvpnProcess != null) {
+            openvpnProcess.destroy();
+            openvpnProcess = null;
+        }
+    }
 
     // todo
     //  - add more rigorous status checks - perhaps querying our 'mcauth.meteorclient.com' or ccbluex's 'ping.liquidproxy.net'
@@ -109,6 +159,21 @@ public class Proxy implements ISerializable<Proxy> {
     public int checkStatus() {
         if (status == Status.CHECKING) return 0;
         status = Status.CHECKING;
+
+        if (type.get().equals(ProxyType.OpenVPN)) {
+            // For OpenVPN, check if config file exists and is readable
+            String configPath = configFile.get();
+            if (configPath != null && !configPath.isEmpty()) {
+                java.io.File file = new java.io.File(configPath);
+                if (file.exists() && file.canRead()) {
+                    status = Status.ALIVE;
+                    latency = 0; // No latency for OpenVPN config check
+                    return 1;
+                }
+            }
+            status = Status.DEAD;
+            return 2;
+        }
 
         boolean timeout = false;
 
@@ -209,6 +274,7 @@ public class Proxy implements ISerializable<Proxy> {
         protected String name = "";
         protected String username = "";
         protected String password = "";
+        protected String configFile = "";
         protected boolean enabled = false;
 
         public Builder type(ProxyType type) {
@@ -241,6 +307,11 @@ public class Proxy implements ISerializable<Proxy> {
             return this;
         }
 
+        public Builder configFile(String configFile) {
+            this.configFile = configFile;
+            return this;
+        }
+
         public Builder enabled(boolean enabled) {
             this.enabled = enabled;
             return this;
@@ -255,6 +326,7 @@ public class Proxy implements ISerializable<Proxy> {
             if (!name.equals(proxy.name.getDefaultValue())) proxy.name.set(name);
             if (!username.equals(proxy.username.getDefaultValue())) proxy.username.set(username);
             if (!password.equals(proxy.password.getDefaultValue())) proxy.password.set(password);
+            if (!configFile.equals(proxy.configFile.getDefaultValue())) proxy.configFile.set(configFile);
             if (enabled != proxy.enabled.getDefaultValue()) proxy.enabled.set(enabled);
 
             return proxy;
@@ -282,6 +354,9 @@ public class Proxy implements ISerializable<Proxy> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Proxy proxy = (Proxy) o;
+        if (type.get().equals(ProxyType.OpenVPN)) {
+            return Objects.equals(proxy.configFile.get(), this.configFile.get());
+        }
         return Objects.equals(proxy.address.get(), this.address.get()) && Objects.equals(proxy.port.get(), this.port.get());
     }
 

@@ -104,7 +104,6 @@ public class Config extends System<Config> {
         .description("Custom font to use.")
         .visible(customFont::get)
         .onChanged(Fonts::load)
-        .defaultValue(Fonts.DEFAULT_FONT)
         .build()
     );
 

@@ -127,10 +127,16 @@ public class Proxies extends System<Proxies> implements Iterable<Proxy> {
 
     public void setEnabled(Proxy proxy, boolean enabled) {
         for (Proxy p : proxies) {
+            if (p.enabled.get() && p.type.get().equals(ProxyType.OpenVPN)) {
+                p.stopOpenVPN();
+            }
             p.enabled.set(false);
         }
 
         proxy.enabled.set(enabled);
+        if (enabled && proxy.type.get().equals(ProxyType.OpenVPN)) {
+            proxy.startOpenVPN();
+        }
         save();
     }
 

@@ -9,7 +9,8 @@ import org.jetbrains.annotations.Nullable;
 
 public enum ProxyType {
     Socks4,
-    Socks5;
+    Socks5,
+    OpenVPN;
 
     @Nullable
     public static ProxyType parse(String group) {
