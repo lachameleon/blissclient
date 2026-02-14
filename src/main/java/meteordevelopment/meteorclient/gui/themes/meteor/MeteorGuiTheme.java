@@ -70,7 +70,7 @@ public class MeteorGuiTheme extends GuiTheme {
     public final Setting<Boolean> categoryIcons = sgGeneral.add(new BoolSetting.Builder()
         .name("category-icons")
         .description("Adds item icons to module categories.")
-        .defaultValue(true)
+        .defaultValue(false)
         .build()
     );
 
@@ -166,7 +166,7 @@ public class MeteorGuiTheme extends GuiTheme {
     private final Setting<SettingColor> starscriptAccessedObjects = color(sgStarscript, "starscript-accessed-objects", "Color of accessed objects (before a dot) in Starscript code.", new SettingColor(152, 118, 170));
 
     public MeteorGuiTheme() {
-        super("Meteor");
+        super("Bliss");
 
         settingsFactory = new DefaultSettingsWidgetFactory(this);
     }

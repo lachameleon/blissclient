@@ -50,7 +50,8 @@ public abstract class EntityRendererMixin<T extends Entity, S extends EntityRend
     private void onRenderLabel(T entity, CallbackInfoReturnable<Text> cir) {
         if (noRender.noNametags()) cir.setReturnValue(null);
         if (!(entity instanceof PlayerEntity player)) return;
-        if (Modules.get().get(Nametags.class).playerNametags() && !(EntityUtils.getGameMode(player) == null && Modules.get().get(Nametags.class).excludeBots()))
+        Nametags nametags = Modules.get().get(Nametags.class);
+        if (nametags != null && nametags.playerNametags() && !(EntityUtils.getGameMode(player) == null && nametags.excludeBots()))
             cir.setReturnValue(null);
     }
 

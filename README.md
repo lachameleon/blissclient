@@ -32,11 +32,10 @@
 
 ## Credits
 
-[Cabaletta](https://github.com/cabaletta) and [WagYourTail](https://github.com/wagyourtail) for [Baritone](https://github.com/cabaletta/baritone)
-
-The [Fabric Team](https://github.com/FabricMC) for [Fabric](https://github.com/FabricMC/fabric-loader) and [Yarn](https://github.com/FabricMC/yarn)
-
-[Meteor Client](https://meteorclient.com/) (This was forked off them)
+- [Cabaletta](https://github.com/cabaletta) and [WagYourTail](https://github.com/wagyourtail) for [Baritone](https://github.com/cabaletta/baritone)
+- The [Fabric Team](https://github.com/FabricMC) for [Fabric](https://github.com/FabricMC/fabric-loader) and [Yarn](https://github.com/FabricMC/yarn)
+- [Meteor Client](https://meteorclient.com/) (This was forked off them)
+- [Stardust](https://github.com/0xTas/stardust) by 0xTas for the addon modules now baked into Bliss Client
 
   
 

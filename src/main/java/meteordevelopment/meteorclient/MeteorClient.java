@@ -5,6 +5,8 @@
 
 package meteordevelopment.meteorclient;
 
+import dev.stardust.config.StardustConfig;
+import dev.stardust.util.MsgUtil;
 import meteordevelopment.meteorclient.addons.AddonManager;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
@@ -106,6 +108,7 @@ public class MeteorClient implements ClientModInitializer {
                 throw new RuntimeException("Addon \"%s\" is too old and cannot be ran.".formatted(addon.name), e);
             }
         });
+        EVENT_BUS.registerLambdaFactory("dev.stardust", (lookupInMethod, klass) -> (MethodHandles.Lookup) lookupInMethod.invoke(null, klass, MethodHandles.lookup()));
 
         ReflectInit.registerPackages();
 
@@ -114,6 +117,8 @@ public class MeteorClient implements ClientModInitializer {
         Categories.init();
 
         Systems.init();
+        StardustConfig.initialize();
+        MsgUtil.initModulePrefixes();
 
         EVENT_BUS.subscribe(this);
 

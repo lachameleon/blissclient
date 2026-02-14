@@ -5,6 +5,16 @@
 
 package meteordevelopment.meteorclient.systems.modules;
 
+import dev.stardust.modules.AdBlocker;
+import dev.stardust.modules.AutoDoors;
+import dev.stardust.modules.BannerData;
+import dev.stardust.modules.Loadouts;
+import dev.stardust.modules.LoreLocator;
+import dev.stardust.modules.Minesweeper;
+import dev.stardust.modules.MusicTweaks;
+import dev.stardust.modules.RoadTrip;
+import dev.stardust.modules.SignatureSign;
+import dev.stardust.modules.StashBrander;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
@@ -153,6 +163,8 @@ public class Modules extends System<Modules> {
         Map<Pair<Module, String>, Integer> modules = new HashMap<>();
 
         for (Module module : this.moduleInstances.values()) {
+            if (Config.get().hiddenModules.get().contains(module)) continue;
+
             String title = module.title;
             int score = Utils.searchLevenshteinDefault(title, text, false);
 
@@ -458,6 +470,8 @@ public class Modules extends System<Modules> {
         add(new Reach());
         add(new Rotation());
         add(new SpeedMine());
+        add(new Loadouts());
+        add(new StashBrander());
     }
 
     private void initMovement() {
@@ -497,6 +511,7 @@ public class Modules extends System<Modules> {
     private void initRender() {
         add(new BetterTab());
         add(new BetterTooltips());
+        add(new LoreLocator());
         add(new BlockESP());
         add(new BlockSelection());
         add(new Blur());
@@ -508,6 +523,7 @@ public class Modules extends System<Modules> {
         add(new CityESP());
         add(new EntityOwner());
         add(new ESP());
+        add(new Grid());
         add(new Freecam());
         add(new FreeLook());
         add(new Fullbright());
@@ -516,9 +532,9 @@ public class Modules extends System<Modules> {
         add(new ItemPhysics());
         add(new ItemHighlight());
         add(new LightOverlay());
-        add(new LogoutSpots());
-        add(new Marker());
-        add(new Nametags());
+        add(new TimeChanger());
+        add(new ZoomPlus());
+        add(new Tracers());
         add(new NoRender());
         add(new PopChams());
         add(new StorageESP());
@@ -536,8 +552,10 @@ public class Modules extends System<Modules> {
 
     private void initWorld() {
         add(new Ambience());
+        add(new BannerData());
         add(new AutoBreed());
         add(new AutoBrewer());
+        add(new AutoDoors());
         add(new AutoMount());
         add(new AutoNametag());
         add(new AutoShearer());
@@ -556,8 +574,10 @@ public class Modules extends System<Modules> {
         add(new PacketMine());
         add(new StashFinder());
         add(new SpawnProofer());
+        add(new SignatureSign());
         add(new Timer());
         add(new VeinMiner());
+        add(new DoubleDoorsInteract());
 
         if (BaritoneUtils.IS_AVAILABLE) {
             add(new Excavator());
@@ -566,18 +586,23 @@ public class Modules extends System<Modules> {
     }
 
     private void initMisc() {
+        add(new AdBlocker());
         add(new AntiPacketKick());
         add(new AutoReconnect());
+        add(new AutoSleep());
         add(new BetterBeacons());
         add(new BetterChat());
         add(new BookBot());
         add(new DiscordPresence());
         add(new InventoryTweaks());
         add(new MessageAura());
+        add(new Minesweeper());
+        add(new MusicTweaks());
         add(new Notebot());
         add(new Notifier());
         add(new PacketCanceller());
         add(new PacketLogger());
+        add(new RoadTrip());
         add(new ServerSpoof());
         add(new SoundBlocker());
         add(new Spam());

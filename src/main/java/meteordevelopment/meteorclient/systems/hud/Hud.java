@@ -5,6 +5,7 @@
 
 package meteordevelopment.meteorclient.systems.hud;
 
+import dev.stardust.hud.ConwayHud;
 import meteordevelopment.meteorclient.events.meteor.CustomFontChangedEvent;
 import meteordevelopment.meteorclient.events.render.Render2DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
@@ -132,6 +133,7 @@ public class Hud extends System<Hud> implements Iterable<HudElement> {
         register(CombatHud.INFO);
         register(MapHud.INFO);
         register(KeyboardHud.INFO);
+        register(ConwayHud.INFO);
 
         // Default config
         if (isFirstInit) resetToDefaultElements();

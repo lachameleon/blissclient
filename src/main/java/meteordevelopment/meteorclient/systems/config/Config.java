@@ -7,6 +7,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import dev.stardust.modules.AdBlocker;
+import dev.stardust.modules.AutoDoors;
+import dev.stardust.modules.BannerData;
+import dev.stardust.modules.Loadouts;
+import dev.stardust.modules.LoreLocator;
+import dev.stardust.modules.Minesweeper;
+import dev.stardust.modules.MusicTweaks;
+import dev.stardust.modules.RoadTrip;
+import dev.stardust.modules.SignatureSign;
+import dev.stardust.modules.StashBrander;
 import meteordevelopment.meteorclient.MeteorClient;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 import meteordevelopment.meteorclient.renderer.Fonts;
@@ -27,6 +37,7 @@ import meteordevelopment.meteorclient.systems.Systems;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
+import meteordevelopment.meteorclient.systems.modules.misc.AutoSleep;
 import meteordevelopment.meteorclient.systems.modules.misc.BetterChat;
 import meteordevelopment.meteorclient.systems.modules.misc.DiscordPresence;
 import meteordevelopment.meteorclient.systems.modules.misc.InventoryTweaks;
@@ -52,16 +63,18 @@ import meteordevelopment.meteorclient.systems.modules.player.MiddleClickExtra;
 import meteordevelopment.meteorclient.systems.modules.player.NameProtect;
 import meteordevelopment.meteorclient.systems.modules.player.Portals;
 import meteordevelopment.meteorclient.systems.modules.render.BetterTooltips;
-import meteordevelopment.meteorclient.systems.modules.render.Blur;
 import meteordevelopment.meteorclient.systems.modules.render.BossStack;
 import meteordevelopment.meteorclient.systems.modules.render.CameraTweaks;
 import meteordevelopment.meteorclient.systems.modules.render.Fullbright;
+import meteordevelopment.meteorclient.systems.modules.render.Grid;
 import meteordevelopment.meteorclient.systems.modules.render.HandView;
 import meteordevelopment.meteorclient.systems.modules.render.ItemHighlight;
 import meteordevelopment.meteorclient.systems.modules.render.ItemPhysics;
 import meteordevelopment.meteorclient.systems.modules.render.LightOverlay;
+import meteordevelopment.meteorclient.systems.modules.render.Nametags;
 import meteordevelopment.meteorclient.systems.modules.render.TimeChanger;
 import meteordevelopment.meteorclient.systems.modules.render.Zoom;
+import meteordevelopment.meteorclient.systems.modules.render.ZoomPlus;
 import meteordevelopment.meteorclient.systems.modules.world.AutoBreed;
 import meteordevelopment.meteorclient.systems.modules.world.AutoBrewer;
 import meteordevelopment.meteorclient.systems.modules.world.AutoMount;
@@ -69,6 +82,7 @@ import meteordevelopment.meteorclient.systems.modules.world.AutoNametag;
 import meteordevelopment.meteorclient.systems.modules.world.AutoShearer;
 import meteordevelopment.meteorclient.systems.modules.world.AutoSign;
 import meteordevelopment.meteorclient.systems.modules.world.AutoSmelter;
+import meteordevelopment.meteorclient.systems.modules.world.DoubleDoorsInteract;
 import meteordevelopment.meteorclient.systems.modules.world.HighwayBuilder;
 import meteordevelopment.meteorclient.systems.modules.world.LiquidFiller;
 import meteordevelopment.meteorclient.systems.modules.world.NoGhostBlocks;
@@ -188,20 +202,25 @@ public class Config extends System<Config> {
             Portals.class,
 
             // Render (cosmetic/info-lite)
-            BetterTooltips.class, Blur.class, BossStack.class, CameraTweaks.class, Fullbright.class, HandView.class,
-            ItemPhysics.class, ItemHighlight.class, LightOverlay.class, TimeChanger.class, Zoom.class,
+            BetterTooltips.class, BossStack.class, CameraTweaks.class, Fullbright.class, Grid.class, HandView.class,
+            ItemPhysics.class, ItemHighlight.class, LightOverlay.class, Nametags.class, TimeChanger.class, Zoom.class, ZoomPlus.class,
 
             // World automation
             AutoBreed.class, AutoBrewer.class, AutoMount.class, AutoNametag.class, AutoShearer.class, AutoSign.class,
-            AutoSmelter.class, HighwayBuilder.class, LiquidFiller.class,
+            AutoSmelter.class, DoubleDoorsInteract.class, HighwayBuilder.class, LiquidFiller.class,
             NoGhostBlocks.class, SpawnProofer.class,
 
             // Movement exceptions
             AutoWalk.class, Sprint.class, AutoWasp.class,
 
             // Misc utilities
-            AutoReconnect.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
+            AutoReconnect.class, AutoSleep.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
             Notebot.class, Notifier.class, SoundBlocker.class
+            ,
+
+            // Stardust modules requested in Bliss
+            MusicTweaks.class, BannerData.class, LoreLocator.class, Loadouts.class, AutoDoors.class,
+            AdBlocker.class, RoadTrip.class, StashBrander.class, SignatureSign.class, Minesweeper.class
         );
 
         List<Module> list = new ArrayList<>();

@@ -7,6 +7,8 @@ package meteordevelopment.meteorclient.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import dev.stardust.commands.Life;
+import dev.stardust.commands.Loadout;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.commands.commands.*;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
@@ -69,6 +71,8 @@ public class Commands {
         add(new WaspCommand());
         add(new LocateCommand());
         add(new HelpCommand());
+        add(new Loadout());
+        add(new Life());
 
         COMMANDS.sort(Comparator.comparing(Command::getName));
 

@@ -6,6 +6,13 @@
 package meteordevelopment.meteorclient.gui;
 
 import meteordevelopment.meteorclient.MeteorClient;
+import dev.stardust.gui.themes.DarkTheme;
+import dev.stardust.gui.themes.LambdaTheme;
+import dev.stardust.gui.themes.MidnightTheme;
+import dev.stardust.gui.themes.MonochromeTheme;
+import dev.stardust.gui.themes.PhosphorTheme;
+import dev.stardust.gui.themes.SnowyTheme;
+import dev.stardust.gui.themes.StardustTheme;
 import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 import meteordevelopment.meteorclient.utils.PostInit;
 import meteordevelopment.meteorclient.utils.PreInit;
@@ -32,6 +39,13 @@ public class GuiThemes {
     @PreInit
     public static void init() {
         add(new MeteorGuiTheme());
+        add(DarkTheme.INSTANCE);
+        add(SnowyTheme.INSTANCE);
+        add(LambdaTheme.INSTANCE);
+        add(StardustTheme.INSTANCE);
+        add(MidnightTheme.INSTANCE);
+        add(PhosphorTheme.INSTANCE);
+        add(MonochromeTheme.INSTANCE);
     }
 
     @PostInit
@@ -40,13 +54,17 @@ public class GuiThemes {
             try {
                 NbtCompound tag = NbtIo.read(FILE.toPath());
 
-                if (tag != null) select(tag.getString("currentTheme", ""));
+                if (tag != null) {
+                    String currentTheme = tag.getString("currentTheme", "");
+                    if ("Meteor".equals(currentTheme)) currentTheme = "Bliss";
+                    select(currentTheme);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-        if (theme == null) select("Meteor");
+        if (theme == null) select("Bliss");
     }
 
     public static void add(GuiTheme theme) {

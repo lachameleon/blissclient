@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "package": "dev.stardust.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "AnvilScreenMixin",
+    "DoorBlockMixin",
+    "DrawContextMixin",
+    "MusicTweaksMinecraftClientMixin",
+    "MusicTrackerMixin",
+    "NarratorManagerMixin",
+    "SoundSystemMixin",
+    "WeightedSoundSetMixin",
+    "accessor.AbstractSignEditScreenAccessor",
+    "accessor.AnvilScreenAccessor",
+    "accessor.AnvilScreenHandlerAccessor",
+    "accessor.DisconnectS2CPacketAccessor",
+    "accessor.MusicTrackerAccessor",
+    "accessor.SourceManagerAccessor",
+    "meteor.BetterTooltipsMixin",
+    "meteor.GuiThemeMixin",
+    "meteor.MeteorGuiThemeMixin",
+    "meteor.NotifierMixin",
+    "meteor.accessor.SettingAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

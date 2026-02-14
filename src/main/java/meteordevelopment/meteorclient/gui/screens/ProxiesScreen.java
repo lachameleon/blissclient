@@ -19,7 +19,6 @@ import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
 import meteordevelopment.meteorclient.settings.Settings;
 import meteordevelopment.meteorclient.systems.proxies.Proxies;
 import meteordevelopment.meteorclient.systems.proxies.Proxy;
-import meteordevelopment.meteorclient.systems.proxies.ProxyType;
 import meteordevelopment.meteorclient.utils.misc.NbtUtils;
 import meteordevelopment.meteorclient.utils.network.MeteorExecutor;
 import org.lwjgl.BufferUtils;
@@ -47,12 +46,6 @@ public class ProxiesScreen extends WindowScreen {
         super(theme, "Proxies");
     }
 
-    private String truncateString(String str, int maxLength) {
-        if (str == null) return "";
-        if (str.length() <= maxLength) return str;
-        return str.substring(0, maxLength - 3) + "...";
-    }
-
     @Override
     public void initWidgets() {
         WTable table = add(theme.table()).expandX().minWidth(400).widget();
@@ -67,13 +60,11 @@ public class ProxiesScreen extends WindowScreen {
         newBtn.action = () -> mc.setScreen(new EditProxyScreen(theme, null, this::reload));
 
         // Import
-        PointerBuffer filters = BufferUtils.createPointerBuffer(2);
+        PointerBuffer filters = BufferUtils.createPointerBuffer(1);
 
         ByteBuffer txtFilter = MemoryUtil.memASCII("*.txt");
-        ByteBuffer ovpnFilter = MemoryUtil.memASCII("*.ovpn");
 
         filters.put(txtFilter);
-        filters.put(ovpnFilter);
         filters.rewind();
 
         WButton importBtn = l.add(theme.button("Import")).expandX().widget();
@@ -116,7 +107,7 @@ public class ProxiesScreen extends WindowScreen {
                 enabled.checked = checked;
             };
 
-            WLabel name = table.add(theme.label(truncateString(proxy.name.get(), 20))).widget();
+            WLabel name = table.add(theme.label(proxy.name.get())).widget();
             name.color = theme.textColor();
 
             WLabel type = table.add(theme.label("(" + proxy.type.get() + ")")).widget();
@@ -125,13 +116,9 @@ public class ProxiesScreen extends WindowScreen {
             WHorizontalList ipList = table.add(theme.horizontalList()).expandCellX().widget();
             ipList.spacing = 0;
 
-            if (proxy.type.get().equals(ProxyType.OpenVPN)) {
-                ipList.add(theme.label(truncateString(proxy.configFile.get(), 30)));
-            } else {
-                ipList.add(theme.label(proxy.address.get()));
-                ipList.add(theme.label(":")).widget().color = theme.textSecondaryColor();
-                ipList.add(theme.label(Integer.toString(proxy.port.get())));
-            }
+            ipList.add(theme.label(proxy.address.get()));
+            ipList.add(theme.label(":")).widget().color = theme.textSecondaryColor();
+            ipList.add(theme.label(Integer.toString(proxy.port.get())));
 
             String s = (proxy.status == Proxy.Status.ALIVE ? proxy.latency + "ms" : proxy.status.toString());
             WLabel status = table.add(theme.label(s)).widget();
@@ -221,9 +208,6 @@ public class ProxiesScreen extends WindowScreen {
         @Override
         public boolean save() {
             MeteorExecutor.execute(value::checkStatus);
-            if (value.type.get().equals(ProxyType.OpenVPN)) {
-                return !isNew || Proxies.get().add(value);
-            }
             return value.resolveAddress() && (!isNew || Proxies.get().add(value));
         }
 

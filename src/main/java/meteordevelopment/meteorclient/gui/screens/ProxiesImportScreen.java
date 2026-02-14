@@ -37,110 +37,86 @@ public class ProxiesImportScreen extends WindowScreen {
     @Override
     public void initWidgets() {
         if (file.exists() && file.isFile()) {
-            String fileName = file.getName().toLowerCase();
-            if (fileName.endsWith(".ovpn")) {
-                // Handle OpenVPN config file
-                add(theme.label("Importing OpenVPN config from " + file.getName() + "...").color(Color.GREEN));
-                WVerticalList list = add(theme.section("Log", false)).widget().add(theme.verticalList()).expandX().widget();
-                Proxies proxies = Proxies.get();
+            add(theme.label("Importing proxies from " + file.getName() + "...").color(Color.GREEN));
+            WVerticalList list = add(theme.section("Log", false)).widget().add(theme.verticalList()).expandX().widget();
+            Proxies proxies = Proxies.get();
+            try {
+                int success = 0, fail = 0;
+                for (String line : Files.readAllLines(file.toPath())) {
+                    Matcher matcher;
+                    Proxy proxy = null;
 
-                String configPath = file.getAbsolutePath();
-                Proxy proxy = new Proxy.Builder()
-                    .type(ProxyType.OpenVPN)
-                    .name(file.getName())
-                    .configFile(configPath)
-                    .build();
+                    matcher = Proxies.PROXY_PATTERN.matcher(line);
+                    if (matcher.matches()) {
+                        String address = matcher.group(2).replaceAll("\\b0+\\B", "");
+                        int port = Integer.parseInt(matcher.group(3));
 
-                if (proxies.add(proxy)) {
-                    list.add(theme.label("Imported OpenVPN config: " + proxy.name.get()).color(Color.GREEN));
-                    add(theme.label("Successfully imported 1 OpenVPN config.").color(Color.GREEN));
-                } else {
-                    list.add(theme.label("OpenVPN config already exists: " + proxy.name.get()).color(Color.ORANGE));
-                    add(theme.label("Failed to import OpenVPN config.").color(Color.RED));
-                }
-            } else {
-                // Handle regular proxy list
-                add(theme.label("Importing proxies from " + file.getName() + "...").color(Color.GREEN));
-                WVerticalList list = add(theme.section("Log", false)).widget().add(theme.verticalList()).expandX().widget();
-                Proxies proxies = Proxies.get();
-                try {
-                    int success = 0, fail = 0;
-                    for (String line : Files.readAllLines(file.toPath())) {
-                        Matcher matcher;
-                        Proxy proxy = null;
+                        proxy = new Proxy.Builder()
+                            .address(address)
+                            .port(port)
+                            .name(matcher.group(1) != null ? matcher.group(1) : address + ":" + port)
+                            .type(matcher.group(4) != null ? ProxyType.parse(matcher.group(4)) : ProxyType.Socks4)
+                            .build();
+                    }
 
-                        matcher = Proxies.PROXY_PATTERN.matcher(line);
-                        if (matcher.matches()) {
-                            String address = matcher.group(2).replaceAll("\\b0+\\B", "");
-                            int port = Integer.parseInt(matcher.group(3));
+                    matcher = Proxies.PROXY_PATTERN_WEBSHARE.matcher(line);
+                    if (proxy == null && matcher.matches()) {
+                        String address = matcher.group(1).replaceAll("\\b0+\\B", "");
+                        int port = Integer.parseInt(matcher.group(2));
 
-                            proxy = new Proxy.Builder()
-                                .address(address)
-                                .port(port)
-                                .name(matcher.group(1) != null ? matcher.group(1) : address + ":" + port)
-                                .type(matcher.group(4) != null ? ProxyType.parse(matcher.group(4)) : ProxyType.Socks4)
-                                .build();
+                        proxy = new Proxy.Builder()
+                            .address(address)
+                            .port(port)
+                            .name(address + ":" + port)
+                            .username(matcher.group(3) != null ? matcher.group(3) : "")
+                            .password(matcher.group(4) != null ? matcher.group(4) : "")
+                            .type(ProxyType.Socks5)
+                            .build();
+                    }
+
+                    matcher = Proxies.PROXY_PATTERN_URI.matcher(line);
+                    if (proxy == null && matcher.matches()) {
+                        String address = matcher.group("addr").replaceAll("\\b0+\\B", "");
+                        int port = Integer.parseInt(matcher.group("port"));
+
+                        ProxyType type = ProxyType.parse(matcher.group(1));
+                        if (type == null) {
+                            if (matcher.group(1) != null && matcher.group(1).equals("socks")) type = ProxyType.Socks5;
+                            // if it has a password it's a socks5 proxy
+                            else if (matcher.group("pass") != null) type = ProxyType.Socks5;
+                            else type = ProxyType.Socks4;
                         }
 
-                        matcher = Proxies.PROXY_PATTERN_WEBSHARE.matcher(line);
-                        if (proxy == null && matcher.matches()) {
-                            String address = matcher.group(1).replaceAll("\\b0+\\B", "");
-                            int port = Integer.parseInt(matcher.group(2));
+                        proxy = new Proxy.Builder()
+                            .address(address)
+                            .port(port)
+                            .name(address + ":" + port)
+                            .username(matcher.group("user") != null ? matcher.group("user") : "")
+                            .password(matcher.group("pass") != null ? matcher.group("pass") : "")
+                            .type(type)
+                            .build();
+                    }
 
-                            proxy = new Proxy.Builder()
-                                .address(address)
-                                .port(port)
-                                .name(address + ":" + port)
-                                .username(matcher.group(3) != null ? matcher.group(3) : "")
-                                .password(matcher.group(4) != null ? matcher.group(4) : "")
-                                .type(ProxyType.Socks5)
-                                .build();
+                    if (proxy == null) {
+                        list.add(theme.label("Unrecognised proxy format: " + line).color(Color.RED));
+                        fail++;
+                    } else {
+                        if (proxies.add(proxy)) {
+                            list.add(theme.label("Imported proxy: " + proxy.name.get()).color(Color.GREEN));
+                            success++;
                         }
-
-                        matcher = Proxies.PROXY_PATTERN_URI.matcher(line);
-                        if (proxy == null && matcher.matches()) {
-                            String address = matcher.group("addr").replaceAll("\\b0+\\B", "");
-                            int port = Integer.parseInt(matcher.group("port"));
-
-                            ProxyType type = ProxyType.parse(matcher.group(1));
-                            if (type == null) {
-                                if (matcher.group(1) != null && matcher.group(1).equals("socks")) type = ProxyType.Socks5;
-                                // if it has a password it's a socks5 proxy
-                                else if (matcher.group("pass") != null) type = ProxyType.Socks5;
-                                else type = ProxyType.Socks4;
-                            }
-
-                            proxy = new Proxy.Builder()
-                                .address(address)
-                                .port(port)
-                                .name(address + ":" + port)
-                                .username(matcher.group("user") != null ? matcher.group("user") : "")
-                                .password(matcher.group("pass") != null ? matcher.group("pass") : "")
-                                .type(type)
-                                .build();
-                        }
-
-                        if (proxy == null) {
-                            list.add(theme.label("Unrecognised proxy format: " + line).color(Color.RED));
+                        else {
+                            list.add(theme.label("Proxy already exists: " + proxy.name.get()).color(Color.ORANGE));
                             fail++;
-                        } else {
-                            if (proxies.add(proxy)) {
-                                list.add(theme.label("Imported proxy: " + proxy.name.get()).color(Color.GREEN));
-                                success++;
-                            }
-                            else {
-                                list.add(theme.label("Proxy already exists: " + proxy.name.get()).color(Color.ORANGE));
-                                fail++;
-                            }
                         }
                     }
-                    add(theme
-                        .label("Successfully imported " + success + "/" + (fail + success) + " proxies.")
-                        .color(Utils.lerp(Color.RED, Color.GREEN, (float) success / (success + fail)))
-                    );
-                } catch (IOException e) {
-                    MeteorClient.LOG.error("An error occurred while importing the proxy file", e);
                 }
+                add(theme
+                    .label("Successfully imported " + success + "/" + (fail + success) + " proxies.")
+                    .color(Utils.lerp(Color.RED, Color.GREEN, (float) success / (success + fail)))
+                );
+            } catch (IOException e) {
+                MeteorClient.LOG.error("An error occurred while importing the proxy file", e);
             }
         } else {
             add(theme.label("Invalid File!"));
