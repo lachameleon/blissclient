@@ -16,3 +16,6 @@ logs
 .idea/*
 !.idea/copyright/*
 !.idea/scopes/*
+*gradle
+*.gradle-home
+*.idea
