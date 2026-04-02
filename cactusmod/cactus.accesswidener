@@ -1,0 +1,19 @@
+accessWidener	v2	intermediary
+accessible	class	net/minecraft/class_374$class_375
+accessible	class	net/minecraft/class_8096
+accessible	method	net/minecraft/class_1761$class_7913	method_47318	(Lnet/minecraft/class_1761$class_7916;)Lnet/minecraft/class_1761$class_7913;
+accessible	field	net/minecraft/class_4264	field_45339	Lnet/minecraft/class_8666;
+accessible	class	net/minecraft/class_355$class_9018
+accessible	method	net/minecraft/class_922	method_4046	(Lnet/minecraft/class_3887;)Z
+accessible	field	net/minecraft/class_437	field_33816	Ljava/util/List;
+accessible	field	net/minecraft/class_1060	field_5286	Ljava/util/Map;
+accessible	method	net/minecraft/class_2302	method_9574	(Lnet/minecraft/class_4538;Lnet/minecraft/class_2338;Lnet/minecraft/class_2680;Z)Lnet/minecraft/class_1799;
+accessible	field	net/minecraft/class_1661	field_56552	Lnet/minecraft/class_10630;
+accessible	method	net/minecraft/class_1011	method_24032	(Ljava/nio/channels/WritableByteChannel;)Z
+accessible	class	net/minecraft/class_1088$class_7778
+accessible	class	net/minecraft/class_1092$class_7779
+accessible	method	net/minecraft/class_1531	method_5652	(Lnet/minecraft/class_11372;)V
+accessible	method	net/minecraft/class_1531	method_5749	(Lnet/minecraft/class_11368;)V
+accessible	method	net/minecraft/class_638	method_41925	()Lnet/minecraft/class_7202;
+accessible	field	net/minecraft/class_778	field_4179	Ljava/lang/ThreadLocal;
+accessible	class	net/minecraft/class_778$class_4303

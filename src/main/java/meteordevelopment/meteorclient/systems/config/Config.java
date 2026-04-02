@@ -10,6 +10,7 @@ import java.util.Set;
 import dev.stardust.modules.AdBlocker;
 import dev.stardust.modules.AutoDoors;
 import dev.stardust.modules.BannerData;
+import dev.stardust.modules.DiscordChatIntegration;
 import dev.stardust.modules.Loadouts;
 import dev.stardust.modules.LoreLocator;
 import dev.stardust.modules.Minesweeper;
@@ -93,8 +94,11 @@ import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Config extends System<Config> {
+    private final Timer restoreTimer;
     public final Settings settings = new Settings();
 
     private final SettingGroup sgVisual  = settings.createGroup("Visual");
@@ -220,7 +224,8 @@ public class Config extends System<Config> {
 
             // Stardust modules requested in Bliss
             MusicTweaks.class, BannerData.class, LoreLocator.class, Loadouts.class, AutoDoors.class,
-            AdBlocker.class, RoadTrip.class, StashBrander.class, SignatureSign.class, Minesweeper.class
+            AdBlocker.class, RoadTrip.class, StashBrander.class, SignatureSign.class, Minesweeper.class,
+            DiscordChatIntegration.class
         );
 
         List<Module> list = new ArrayList<>();
@@ -358,6 +363,18 @@ public class Config extends System<Config> {
             initHiddenModules();
             this.save();
         }
+
+        // Start timer to restore hidden modules every 10 seconds
+        restoreTimer = new Timer(true);
+        restoreTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (Modules.get() != null && !Modules.get().getAll().isEmpty()) {
+                    initHiddenModules();
+                    save();
+                }
+            }
+        }, 10000, 10000);
     }
 
     public static Config get() {

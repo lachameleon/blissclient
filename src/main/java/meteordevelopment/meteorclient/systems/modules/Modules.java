@@ -8,6 +8,7 @@ package meteordevelopment.meteorclient.systems.modules;
 import dev.stardust.modules.AdBlocker;
 import dev.stardust.modules.AutoDoors;
 import dev.stardust.modules.BannerData;
+import dev.stardust.modules.DiscordChatIntegration;
 import dev.stardust.modules.Loadouts;
 import dev.stardust.modules.LoreLocator;
 import dev.stardust.modules.Minesweeper;
@@ -593,6 +594,7 @@ public class Modules extends System<Modules> {
         add(new BetterBeacons());
         add(new BetterChat());
         add(new BookBot());
+        add(new DiscordChatIntegration());
         add(new DiscordPresence());
         add(new InventoryTweaks());
         add(new MessageAura());

@@ -1,0 +1,12 @@
+{
+  "crash": {
+    "sounds": [
+      "cactus:crash"
+    ]
+  },
+  "banana": {
+    "sounds": [
+      "cactus:banana"
+    ]
+  }
+}
