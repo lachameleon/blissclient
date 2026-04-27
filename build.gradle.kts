@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.fabric.loom)
+    id("fabric-loom") version "1.16-SNAPSHOT"
     id("maven-publish")
 }
 
@@ -93,7 +93,7 @@ dependencies {
     jij(libs.netty.handler.proxy) { isTransitive = false }
     jij(libs.netty.codec.socks) { isTransitive = false }
     jij(libs.waybackauthlib)
-    jij(libs.java.websocket)
+    jij("org.java-websocket:Java-WebSocket:1.6.0")
 }
 
 sourceSets {
