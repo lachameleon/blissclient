@@ -171,7 +171,7 @@ public class Config extends System<Config> {
 
             MusicTweaks.class, BannerData.class, LoreLocator.class, Loadouts.class, AutoDoors.class,
             AdBlocker.class, RoadTrip.class, StashBrander.class, SignatureSign.class, Minesweeper.class,
-            BlissChat.class, DiscordChatIntegration.class
+            DiscordChatIntegration.class
         );
 
         List<Module> hidden = new ArrayList<>();

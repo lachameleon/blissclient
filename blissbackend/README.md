@@ -1,29 +1,24 @@
 # Bliss Backend
 
-Cloudflare Workers backend for Bliss Chat.
+Cloudflare Workers backend for Bliss Client tracker stats.
 
-## Run locally
+## Run Locally
 
 ```sh
 npm install
 npm run dev
 ```
 
-For local backend testing, set the BlissChat module `backend-url` setting to `ws://localhost:8787/chat`. Deploy with:
+Deploy with:
 
 ```sh
 npm run deploy
 ```
 
-The Minecraft client defaults to `wss://blissclientbackend.hogridersupercell123.workers.dev/chat`.
+## API
 
-## Auth model
+- `POST /sightings` accepts player tracker reports from the Minecraft client.
+- `GET /stats` returns the dashboard summary JSON.
+- `/` serves the dashboard and polls `/stats`.
 
-Minecraft clients cannot send chat until they pass Mojang online-mode verification:
-
-1. The Worker Durable Object sends a random `challenge`.
-2. The client calls Minecraft's session service `joinServer(profileId, accessToken, challenge)`.
-3. The Worker checks Mojang `hasJoined?username=<name>&serverId=<challenge>`.
-4. Only verified profiles can publish messages.
-
-The backend displays the server address the player reports from their current multiplayer connection. It does not expose the player's network client IP.
+The Minecraft client posts to `https://blissclientbackend.hogridersupercell123.workers.dev/sightings`.

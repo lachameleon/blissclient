@@ -578,7 +578,6 @@ public class Modules extends System<Modules> {
         add(new BetterChat());
         add(new AutoDoors());
         add(new BannerData());
-        add(new BlissChat());
         add(new BookBot());
         add(new DiscordChatIntegration());
         add(new InventoryTweaks());

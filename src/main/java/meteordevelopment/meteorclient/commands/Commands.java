@@ -7,7 +7,6 @@ package meteordevelopment.meteorclient.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import dev.stardust.commands.BlissChatCommand;
 import dev.stardust.commands.DiscordChatCommand;
 import dev.stardust.commands.Life;
 import dev.stardust.commands.Loadout;
@@ -74,7 +73,6 @@ public class Commands {
         add(new WaspCommand());
         add(new LocateCommand());
         add(new HelpCommand());
-        add(new BlissChatCommand());
         add(new DiscordChatCommand());
         add(new Loadout());
         add(new Life());

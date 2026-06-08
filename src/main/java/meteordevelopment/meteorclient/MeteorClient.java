@@ -6,11 +6,9 @@
 package meteordevelopment.meteorclient;
 
 import dev.stardust.config.StardustConfig;
-import dev.stardust.modules.BlissChat;
 import dev.stardust.util.MsgUtil;
 import meteordevelopment.meteorclient.addons.AddonManager;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
-import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.meteor.KeyInputEvent;
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
@@ -162,12 +160,6 @@ public class MeteorClient implements ClientModInitializer {
         if (mc.screen == null && mc.getOverlay() == null && KeyBinds.OPEN_COMMANDS.consumeClick()) {
             mc.setScreen(new ChatScreen(Config.get().prefix.get(), true));
         }
-    }
-
-    @EventHandler
-    private void onGameJoined(GameJoinedEvent event) {
-        BlissChat blissChat = Modules.get().get(BlissChat.class);
-        if (blissChat != null) blissChat.connectOnServerJoin();
     }
 
     @EventHandler

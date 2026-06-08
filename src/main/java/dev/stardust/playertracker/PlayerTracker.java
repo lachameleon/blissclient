@@ -1,12 +1,10 @@
 package dev.stardust.playertracker;
 
-import dev.stardust.modules.BlissChat;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.systems.System;
 import meteordevelopment.meteorclient.systems.Systems;
-import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.multiplayer.ServerData;
@@ -36,8 +34,8 @@ public class PlayerTracker extends System<PlayerTracker> {
     private static final long MIN_ENCOUNTER_MS = 60000;
     private static final long MAX_TICK_DELTA_MS = 2500;
     private static final long AUTOSAVE_INTERVAL_MS = 60000;
-    private static final long BACKEND_REPORT_INTERVAL_MS = 15000;
     private static final long HEATMAP_SAMPLE_INTERVAL_MS = 2000;
+    private static final long BACKEND_REPORT_INTERVAL_MS = 30000;
     private static final double AGGRESSION_DISTANCE = 16;
     public static final int HEATMAP_BIN_SIZE = 128;
 
@@ -317,6 +315,37 @@ public class PlayerTracker extends System<PlayerTracker> {
         reportSighting(stats, active, server, dimension, now);
     }
 
+    private void reportSighting(PlayerStats stats, ActiveSighting active, String server, String dimension, long now) {
+        if (active.lastReport > 0 && now - active.lastReport < BACKEND_REPORT_INTERVAL_MS) return;
+        if (mc.getUser() == null || mc.getUser().getName() == null || mc.getUser().getProfileId() == null) return;
+
+        active.lastReport = now;
+        StatsBackendClient.report(new SightingReport(
+            mc.getUser().getName(),
+            mc.getUser().getProfileId().toString(),
+            server,
+            stats.name,
+            stats.uuid.toString(),
+            server,
+            dimension,
+            stats.lastX,
+            stats.lastY,
+            stats.lastZ,
+            stats.lastDistance,
+            stats.lastHealth,
+            stats.lastMaxHealth,
+            stats.lastPing,
+            stats.lastGameMode,
+            stats.sightingCount,
+            stats.totalVisibleMs,
+            active.durationMs,
+            stats.averageDistance(),
+            stats.lastSpeed,
+            heatmapBase(stats.lastX),
+            heatmapBase(stats.lastZ)
+        ));
+    }
+
     private void startEncounter(PlayerStats stats, ActiveSighting active, String server, String dimension, long now) {
         active.counted = true;
         stats.sightingCount++;
@@ -430,40 +459,6 @@ public class PlayerTracker extends System<PlayerTracker> {
         return mc.level.dimension().identifier().toString();
     }
 
-    private static void reportSighting(PlayerStats stats, ActiveSighting active, String server, String dimension, long now) {
-        if (!active.counted || active.durationMs < MIN_ENCOUNTER_MS) return;
-        if (mc.getCurrentServer() == null) return;
-        if (active.lastReport != 0 && now - active.lastReport < BACKEND_REPORT_INTERVAL_MS) return;
-
-        active.lastReport = now;
-
-        BlissChat blissChat = Modules.get().get(BlissChat.class);
-        if (blissChat == null) return;
-
-        blissChat.reportSeenPlayer(new SightingReport(
-            stats.name,
-            stats.uuid,
-            server,
-            dimension,
-            stats.lastX,
-            stats.lastY,
-            stats.lastZ,
-            stats.lastDistance,
-            stats.lastHealth,
-            stats.lastMaxHealth,
-            stats.lastPing,
-            stats.lastGameMode,
-            stats.sightingCount,
-            stats.totalVisibleMs,
-            active.durationMs,
-            stats.averageDistance(),
-            stats.lastSpeed,
-            heatmapBase(stats.lastX),
-            heatmapBase(stats.lastZ),
-            now
-        ));
-    }
-
     private static double distance(double x1, double y1, double z1, double x2, double y2, double z2) {
         double dx = x1 - x2;
         double dy = y1 - y2;
@@ -559,7 +554,6 @@ public class PlayerTracker extends System<PlayerTracker> {
         private boolean counted;
         private long lastSample;
         private long durationMs;
-        private long lastReport;
         private long lastHeatmapSample;
         private boolean hasPosition;
         private double lastX;
@@ -570,15 +564,32 @@ public class PlayerTracker extends System<PlayerTracker> {
         private double damageTaken;
         private double closestAggressionDistance = Double.MAX_VALUE;
         private long lastAggressiveAt;
+        private long lastReport;
 
         private ActiveSighting(long now) {
             this.lastSample = now;
         }
     }
 
+    public record HeatmapCell(String dimension, int x, int z, int count) {
+        public int centerX() {
+            return x + HEATMAP_BIN_SIZE / 2;
+        }
+
+        public int centerZ() {
+            return z + HEATMAP_BIN_SIZE / 2;
+        }
+    }
+
+    public record CountEntry(String key, int count) {
+    }
+
     public record SightingReport(
-        String username,
-        UUID uuid,
+        String reporterUsername,
+        String reporterUuid,
+        String reporterServerAddress,
+        String seenUsername,
+        String seenUuid,
         String serverAddress,
         String dimension,
         double x,
@@ -595,22 +606,8 @@ public class PlayerTracker extends System<PlayerTracker> {
         double averageDistance,
         double speed,
         int heatmapX,
-        int heatmapZ,
-        long timestamp
+        int heatmapZ
     ) {
-    }
-
-    public record HeatmapCell(String dimension, int x, int z, int count) {
-        public int centerX() {
-            return x + HEATMAP_BIN_SIZE / 2;
-        }
-
-        public int centerZ() {
-            return z + HEATMAP_BIN_SIZE / 2;
-        }
-    }
-
-    public record CountEntry(String key, int count) {
     }
 
     public static class PlayerStats {
