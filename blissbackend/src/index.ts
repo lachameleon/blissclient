@@ -428,7 +428,6 @@ export class ChatRoom extends DurableObject<Env> {
 
     const sighting = sanitizePlayerSighting(payload, attachment.serverAddress);
     if (!sighting) {
-      this.sendError(ws, "Invalid player sighting.");
       return;
     }
 

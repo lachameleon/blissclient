@@ -64,7 +64,11 @@ public class BlissChatClient extends WebSocketClient {
                 flushPending();
             }
             case "chat" -> module.displayChatMessage(json);
-            case "error" -> module.showError(string(json, "message", "Backend rejected the request."));
+            case "error" -> {
+                String error = string(json, "message", "Backend rejected the request.");
+                if ("Invalid player sighting.".equals(error)) return;
+                module.showError(error);
+            }
             default -> {
             }
         }

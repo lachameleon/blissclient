@@ -13,7 +13,7 @@ import static net.minecraft.commands.SharedSuggestionProvider.suggest;
 
 public class StatsCommand extends Command {
     public StatsCommand() {
-        super("stats", "Shows detailed local sighting stats for a tracked player.", "seen");
+        super("stats", "Shows detailed local encounter stats for a tracked player.", "seen");
     }
 
     @Override
@@ -21,13 +21,12 @@ public class StatsCommand extends Command {
         builder.executes(_ -> {
             PlayerTracker tracker = PlayerTracker.get();
             if (tracker == null || tracker.count() == 0) {
-                info("No player sightings recorded yet.");
                 return SINGLE_SUCCESS;
             }
 
             info("--- Player Tracker ((highlight)%d(default)) ---", tracker.count());
             for (PlayerTracker.PlayerStats stats : tracker.getTop(5)) {
-                info("(highlight)%s(default) - %d sightings, %s visible, last seen %s",
+                info("(highlight)%s(default) - %d encounters, %s visible, last seen %s",
                     stats.name,
                     stats.sightingCount,
                     formatDuration(stats.totalVisibleMs),
@@ -46,14 +45,12 @@ public class StatsCommand extends Command {
             .executes(context -> {
                 PlayerTracker tracker = PlayerTracker.get();
                 if (tracker == null) {
-                    error("Player tracker is not loaded.");
                     return SINGLE_SUCCESS;
                 }
 
                 String player = StringArgumentType.getString(context, "player");
                 PlayerTracker.PlayerStats stats = tracker.get(player);
                 if (stats == null) {
-                    error("No sightings recorded for %s.", player);
                     return SINGLE_SUCCESS;
                 }
 
@@ -66,7 +63,6 @@ public class StatsCommand extends Command {
     private void openGui(PlayerTracker.PlayerStats stats) {
         PlayerTracker tracker = PlayerTracker.get();
         if (tracker == null) {
-            error("Player tracker is not loaded.");
             return;
         }
 

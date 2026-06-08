@@ -33,10 +33,12 @@ import java.util.UUID;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class PlayerTracker extends System<PlayerTracker> {
+    private static final long MIN_ENCOUNTER_MS = 60000;
     private static final long MAX_TICK_DELTA_MS = 2500;
     private static final long AUTOSAVE_INTERVAL_MS = 60000;
     private static final long BACKEND_REPORT_INTERVAL_MS = 15000;
     private static final long HEATMAP_SAMPLE_INTERVAL_MS = 2000;
+    private static final double AGGRESSION_DISTANCE = 16;
     public static final int HEATMAP_BIN_SIZE = 128;
 
     private final Map<UUID, PlayerStats> players = new HashMap<>();
@@ -44,6 +46,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     private final Map<UUID, ActiveSighting> activeSightings = new HashMap<>();
 
     private long lastAutosave;
+    private float lastSelfHealth = -1;
 
     public PlayerTracker() {
         super("player-tracker");
@@ -56,6 +59,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     @EventHandler
     private void onGameJoined(GameJoinedEvent event) {
         activeSightings.clear();
+        lastSelfHealth = -1;
     }
 
     @EventHandler
@@ -68,6 +72,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     private void onTick(TickEvent.Post event) {
         if (mc.level == null || mc.player == null) {
             closeAllSightings();
+            lastSelfHealth = -1;
             return;
         }
 
@@ -75,6 +80,12 @@ public class PlayerTracker extends System<PlayerTracker> {
         String server = getServerName();
         String dimension = getDimensionName();
         Set<UUID> visible = new HashSet<>();
+        float selfHealth = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+        float selfDamage = 0;
+        if (lastSelfHealth >= 0 && selfHealth < lastSelfHealth - 0.05f) {
+            selfDamage = lastSelfHealth - selfHealth;
+        }
+        lastSelfHealth = selfHealth;
 
         for (Player player : mc.level.players()) {
             if (player == mc.player || player.getUUID().equals(mc.player.getUUID())) continue;
@@ -88,17 +99,12 @@ public class PlayerTracker extends System<PlayerTracker> {
             if (active == null) {
                 active = new ActiveSighting(now);
                 activeSightings.put(uuid, active);
-
-                stats.sightingCount++;
-                increment(stats.serverSightings, server);
-                increment(stats.dimensionSightings, dimension);
-                increment(stats.hourSightings, hourKey(now));
-                increment(stats.daySightings, dayKey(now));
             }
 
             sample(stats, active, player, server, dimension, now);
         }
 
+        if (selfDamage > 0) markLikelyAggressor(visible, selfDamage, now);
         closeMissingSightings(visible);
 
         if (now - lastAutosave >= AUTOSAVE_INTERVAL_MS) {
@@ -111,10 +117,13 @@ public class PlayerTracker extends System<PlayerTracker> {
         if (name == null) return null;
 
         UUID uuid = names.get(normalize(name));
-        if (uuid != null) return players.get(uuid);
+        if (uuid != null) {
+            PlayerStats stats = players.get(uuid);
+            return stats != null && stats.hasValidEncounters() ? stats : null;
+        }
 
         for (PlayerStats stats : players.values()) {
-            if (stats.name.equalsIgnoreCase(name)) return stats;
+            if (stats.hasValidEncounters() && stats.name.equalsIgnoreCase(name)) return stats;
         }
 
         return null;
@@ -122,6 +131,7 @@ public class PlayerTracker extends System<PlayerTracker> {
 
     public List<String> getKnownNames() {
         return players.values().stream()
+            .filter(PlayerStats::hasValidEncounters)
             .map(stats -> stats.name)
             .sorted(String.CASE_INSENSITIVE_ORDER)
             .toList();
@@ -129,6 +139,7 @@ public class PlayerTracker extends System<PlayerTracker> {
 
     public List<PlayerStats> getTop(int limit) {
         return players.values().stream()
+            .filter(PlayerStats::hasValidEncounters)
             .sorted(Comparator.comparingLong((PlayerStats stats) -> stats.totalVisibleMs).reversed())
             .limit(limit)
             .toList();
@@ -137,6 +148,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     public List<HeatmapCell> getHeatmap(int limit) {
         Map<String, Integer> counts = new HashMap<>();
         for (PlayerStats stats : players.values()) {
+            if (!stats.hasValidEncounters()) continue;
             for (Map.Entry<String, Integer> entry : stats.coordinateHeatmap.entrySet()) {
                 counts.merge(entry.getKey(), entry.getValue(), Integer::sum);
             }
@@ -146,7 +158,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     }
 
     public int count() {
-        return players.size();
+        return (int) players.values().stream().filter(PlayerStats::hasValidEncounters).count();
     }
 
     public boolean isVisible(UUID uuid) {
@@ -159,6 +171,7 @@ public class PlayerTracker extends System<PlayerTracker> {
         ListTag playersTag = new ListTag();
 
         for (PlayerStats stats : players.values()) {
+            if (!stats.hasValidEncounters()) continue;
             playersTag.add(stats.toTag());
         }
 
@@ -204,17 +217,33 @@ public class PlayerTracker extends System<PlayerTracker> {
         long delta = Math.max(0, now - active.lastSample);
         if (delta > MAX_TICK_DELTA_MS) delta = 50;
 
-        stats.totalVisibleMs += delta;
         active.durationMs += delta;
         active.lastSample = now;
 
-        stats.longestSightingMs = Math.max(stats.longestSightingMs, active.durationMs);
         stats.lastSeen = now;
         stats.lastServer = server;
         stats.lastDimension = dimension;
         stats.lastX = player.getX();
         stats.lastY = player.getY();
         stats.lastZ = player.getZ();
+        stats.lastDistance = player.distanceTo(mc.player);
+        stats.lastHealth = player.getHealth();
+        stats.lastMaxHealth = player.getMaxHealth();
+
+        PlayerInfo info = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(player.getUUID());
+        if (info != null) {
+            stats.lastPing = info.getLatency();
+            if (info.getGameMode() != null) stats.lastGameMode = info.getGameMode().getName();
+        }
+
+        if (!active.counted) {
+            if (active.durationMs < MIN_ENCOUNTER_MS) return;
+            startEncounter(stats, active, server, dimension, now);
+            delta = active.durationMs;
+        }
+
+        stats.totalVisibleMs += delta;
+        stats.longestSightingMs = Math.max(stats.longestSightingMs, active.durationMs);
         if (stats.coordinateSamples == 0) {
             stats.firstX = stats.lastX;
             stats.firstY = stats.lastY;
@@ -248,34 +277,27 @@ public class PlayerTracker extends System<PlayerTracker> {
         active.lastZ = stats.lastZ;
         active.hasPosition = true;
 
-        double distance = player.distanceTo(mc.player);
-        stats.lastDistance = distance;
-        if (distance < stats.minDistance) {
-            stats.minDistance = distance;
+        if (stats.lastDistance < stats.minDistance) {
+            stats.minDistance = stats.lastDistance;
             stats.closestX = stats.lastX;
             stats.closestY = stats.lastY;
             stats.closestZ = stats.lastZ;
         }
-        if (distance > stats.maxDistance) {
-            stats.maxDistance = distance;
+        if (stats.lastDistance > stats.maxDistance) {
+            stats.maxDistance = stats.lastDistance;
             stats.farthestX = stats.lastX;
             stats.farthestY = stats.lastY;
             stats.farthestZ = stats.lastZ;
         }
-        stats.totalDistance += distance;
+        stats.totalDistance += stats.lastDistance;
         stats.distanceSamples++;
 
-        float health = player.getHealth();
-        stats.lastHealth = health;
-        stats.lastMaxHealth = player.getMaxHealth();
-        stats.minHealth = Math.min(stats.minHealth, health);
-        stats.maxHealth = Math.max(stats.maxHealth, health);
-        stats.totalHealth += health;
+        stats.minHealth = Math.min(stats.minHealth, stats.lastHealth);
+        stats.maxHealth = Math.max(stats.maxHealth, stats.lastHealth);
+        stats.totalHealth += stats.lastHealth;
         stats.healthSamples++;
 
-        PlayerInfo info = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(player.getUUID());
         if (info != null) {
-            stats.lastPing = info.getLatency();
             stats.minPing = stats.minPing < 0 ? stats.lastPing : Math.min(stats.minPing, stats.lastPing);
             stats.maxPing = Math.max(stats.maxPing, stats.lastPing);
             stats.totalPing += stats.lastPing;
@@ -295,6 +317,48 @@ public class PlayerTracker extends System<PlayerTracker> {
         reportSighting(stats, active, server, dimension, now);
     }
 
+    private void startEncounter(PlayerStats stats, ActiveSighting active, String server, String dimension, long now) {
+        active.counted = true;
+        stats.sightingCount++;
+        increment(stats.serverSightings, server);
+        increment(stats.dimensionSightings, dimension);
+        increment(stats.hourSightings, hourKey(now));
+        increment(stats.daySightings, dayKey(now));
+    }
+
+    private void markLikelyAggressor(Set<UUID> visible, double damage, long now) {
+        UUID closestUuid = null;
+        PlayerStats closestStats = null;
+        double closestDistance = AGGRESSION_DISTANCE;
+
+        for (UUID uuid : visible) {
+            PlayerStats stats = players.get(uuid);
+            ActiveSighting active = activeSightings.get(uuid);
+            if (stats == null || active == null) continue;
+            if (stats.lastDistance <= closestDistance) {
+                closestDistance = stats.lastDistance;
+                closestUuid = uuid;
+                closestStats = stats;
+            }
+        }
+
+        if (closestUuid == null || closestStats == null) return;
+
+        ActiveSighting active = activeSightings.get(closestUuid);
+        active.aggressive = true;
+        active.damageEvents++;
+        active.damageTaken += damage;
+        active.lastAggressiveAt = now;
+        active.closestAggressionDistance = Math.min(active.closestAggressionDistance, closestDistance);
+
+        if (active.counted) {
+            closestStats.openEncounterDamageEvents++;
+            closestStats.openEncounterDamageTaken += damage;
+            closestStats.lastAggressiveAt = now;
+            closestStats.closestAggressionDistance = Math.min(closestStats.closestAggressionDistance, closestDistance);
+        }
+    }
+
     private void closeMissingSightings(Set<UUID> visible) {
         activeSightings.entrySet().removeIf(entry -> {
             if (visible.contains(entry.getKey())) return false;
@@ -312,10 +376,23 @@ public class PlayerTracker extends System<PlayerTracker> {
 
     private void finishSighting(PlayerStats stats, ActiveSighting active) {
         if (stats == null || active == null || active.durationMs <= 0) return;
+        if (!active.counted || active.durationMs < MIN_ENCOUNTER_MS) {
+            stats.shortSightingsIgnored++;
+            return;
+        }
+
         stats.completedSightings++;
         stats.lastSightingMs = active.durationMs;
         stats.shortestSightingMs = Math.min(stats.shortestSightingMs, active.durationMs);
         stats.longestSightingMs = Math.max(stats.longestSightingMs, active.durationMs);
+        if (active.aggressive) stats.aggressiveEncounters++;
+        stats.damageEvents += active.damageEvents;
+        stats.totalDamageTakenNearPlayer += active.damageTaken;
+        stats.maxEncounterDamageTaken = Math.max(stats.maxEncounterDamageTaken, active.damageTaken);
+        if (active.lastAggressiveAt > 0) stats.lastAggressiveAt = active.lastAggressiveAt;
+        stats.closestAggressionDistance = Math.min(stats.closestAggressionDistance, active.closestAggressionDistance);
+        stats.openEncounterDamageEvents = 0;
+        stats.openEncounterDamageTaken = 0;
     }
 
     private void index(PlayerStats stats) {
@@ -354,6 +431,7 @@ public class PlayerTracker extends System<PlayerTracker> {
     }
 
     private static void reportSighting(PlayerStats stats, ActiveSighting active, String server, String dimension, long now) {
+        if (!active.counted || active.durationMs < MIN_ENCOUNTER_MS) return;
         if (mc.getCurrentServer() == null) return;
         if (active.lastReport != 0 && now - active.lastReport < BACKEND_REPORT_INTERVAL_MS) return;
 
@@ -469,7 +547,16 @@ public class PlayerTracker extends System<PlayerTracker> {
             .orElse("none");
     }
 
+    private static List<CountEntry> topEntries(Map<String, Integer> counts, int limit) {
+        return counts.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .limit(limit)
+            .map(entry -> new CountEntry(entry.getKey(), entry.getValue()))
+            .toList();
+    }
+
     private static class ActiveSighting {
+        private boolean counted;
         private long lastSample;
         private long durationMs;
         private long lastReport;
@@ -478,6 +565,11 @@ public class PlayerTracker extends System<PlayerTracker> {
         private double lastX;
         private double lastY;
         private double lastZ;
+        private boolean aggressive;
+        private int damageEvents;
+        private double damageTaken;
+        private double closestAggressionDistance = Double.MAX_VALUE;
+        private long lastAggressiveAt;
 
         private ActiveSighting(long now) {
             this.lastSample = now;
@@ -516,6 +608,9 @@ public class PlayerTracker extends System<PlayerTracker> {
         public int centerZ() {
             return z + HEATMAP_BIN_SIZE / 2;
         }
+    }
+
+    public record CountEntry(String key, int count) {
     }
 
     public static class PlayerStats {
@@ -573,6 +668,15 @@ public class PlayerTracker extends System<PlayerTracker> {
         public long lastSightingMs;
         public long shortestSightingMs = Long.MAX_VALUE;
         public int completedSightings;
+        public int shortSightingsIgnored;
+        public int aggressiveEncounters;
+        public int damageEvents;
+        public int openEncounterDamageEvents;
+        public double totalDamageTakenNearPlayer;
+        public double openEncounterDamageTaken;
+        public double maxEncounterDamageTaken;
+        public double closestAggressionDistance = Double.MAX_VALUE;
+        public long lastAggressiveAt;
         public long heatmapSamples;
         public Map<String, Integer> serverSightings = new LinkedHashMap<>();
         public Map<String, Integer> dimensionSightings = new LinkedHashMap<>();
@@ -609,6 +713,10 @@ public class PlayerTracker extends System<PlayerTracker> {
             return totalTravelDistance / (totalVisibleMs / 1000.0);
         }
 
+        public boolean hasValidEncounters() {
+            return sightingCount > 0;
+        }
+
         public long averageSightingMs() {
             return sightingCount == 0 ? 0 : totalVisibleMs / sightingCount;
         }
@@ -619,6 +727,35 @@ public class PlayerTracker extends System<PlayerTracker> {
 
         public List<HeatmapCell> topHeatmap(int limit) {
             return heatmapCells(coordinateHeatmap, limit);
+        }
+
+        public double aggressivenessChance() {
+            if (completedSightings == 0) return 0;
+            return aggressiveEncounters * 100.0 / completedSightings;
+        }
+
+        public int totalDamageEvents() {
+            return damageEvents + openEncounterDamageEvents;
+        }
+
+        public double totalObservedDamage() {
+            return totalDamageTakenNearPlayer + openEncounterDamageTaken;
+        }
+
+        public double closestAggressionDistance() {
+            return closestAggressionDistance == Double.MAX_VALUE ? 0 : closestAggressionDistance;
+        }
+
+        public List<CountEntry> topServers(int limit) {
+            return topEntries(serverSightings, limit);
+        }
+
+        public List<CountEntry> topDimensions(int limit) {
+            return topEntries(dimensionSightings, limit);
+        }
+
+        public List<CountEntry> topGameModes(int limit) {
+            return topEntries(gameModeSamples, limit);
         }
 
         public String topServer() {
@@ -704,6 +841,13 @@ public class PlayerTracker extends System<PlayerTracker> {
             tag.putLong("lastSightingMs", lastSightingMs);
             tag.putLong("shortestSightingMs", shortestSightingMs);
             tag.putInt("completedSightings", completedSightings);
+            tag.putInt("shortSightingsIgnored", shortSightingsIgnored);
+            tag.putInt("aggressiveEncounters", aggressiveEncounters);
+            tag.putInt("damageEvents", damageEvents);
+            tag.putDouble("totalDamageTakenNearPlayer", totalDamageTakenNearPlayer);
+            tag.putDouble("maxEncounterDamageTaken", maxEncounterDamageTaken);
+            tag.putDouble("closestAggressionDistance", closestAggressionDistance);
+            tag.putLong("lastAggressiveAt", lastAggressiveAt);
             tag.putLong("heatmapSamples", heatmapSamples);
             tag.put("serverSightings", countsToTag(serverSightings));
             tag.put("dimensionSightings", countsToTag(dimensionSightings));
@@ -778,6 +922,13 @@ public class PlayerTracker extends System<PlayerTracker> {
             stats.lastSightingMs = tag.getLongOr("lastSightingMs", 0);
             stats.shortestSightingMs = tag.getLongOr("shortestSightingMs", Long.MAX_VALUE);
             stats.completedSightings = tag.getIntOr("completedSightings", 0);
+            stats.shortSightingsIgnored = tag.getIntOr("shortSightingsIgnored", 0);
+            stats.aggressiveEncounters = tag.getIntOr("aggressiveEncounters", 0);
+            stats.damageEvents = tag.getIntOr("damageEvents", 0);
+            stats.totalDamageTakenNearPlayer = tag.getDoubleOr("totalDamageTakenNearPlayer", 0);
+            stats.maxEncounterDamageTaken = tag.getDoubleOr("maxEncounterDamageTaken", 0);
+            stats.closestAggressionDistance = tag.getDoubleOr("closestAggressionDistance", Double.MAX_VALUE);
+            stats.lastAggressiveAt = tag.getLongOr("lastAggressiveAt", 0);
             stats.heatmapSamples = tag.getLongOr("heatmapSamples", 0);
             stats.serverSightings = countsFromTag(tag, "serverSightings");
             stats.dimensionSightings = countsFromTag(tag, "dimensionSightings");
