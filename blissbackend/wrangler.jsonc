@@ -10,8 +10,8 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "CHAT_ROOM",
-        "class_name": "ChatRoom"
+        "name": "STATS_ROOM",
+        "class_name": "StatsRoom"
       }
     ]
   },
@@ -19,6 +19,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChatRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["StatsRoom"]
     }
   ]
 }

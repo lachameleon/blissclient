@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 export interface Env {
-  CHAT_ROOM: DurableObjectNamespace<ChatRoom>;
+  STATS_ROOM: DurableObjectNamespace<StatsRoom>;
 }
 
 interface ReporterIdentity {
@@ -96,8 +96,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/stats" || url.pathname === "/sightings") {
-      const id = env.CHAT_ROOM.idFromName("global");
-      return env.CHAT_ROOM.get(id).fetch(request);
+      const id = env.STATS_ROOM.idFromName("global");
+      return env.STATS_ROOM.get(id).fetch(request);
     }
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -117,7 +117,7 @@ export default {
   }
 } satisfies ExportedHandler<Env>;
 
-export class ChatRoom extends DurableObject<Env> {
+export class StatsRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
@@ -419,6 +419,8 @@ export class ChatRoom extends DurableObject<Env> {
     }));
   }
 }
+
+export class ChatRoom extends StatsRoom {}
 
 interface DashboardStats {
   generatedAt: number;
@@ -1223,14 +1225,27 @@ const INDEX_HTML = `<!doctype html>
     let stats = {};
 
     async function refreshStats() {
+      let nextStats;
       try {
         setStatus("Syncing", "");
         const response = await fetch("/stats", { cache: "no-store" });
-        if (!response.ok) throw new Error("stats request failed");
-        updateStats(await response.json());
+        if (!response.ok) throw new Error("stats request failed: " + response.status);
+        nextStats = await response.json();
         setStatus("Live", "live");
-      } catch {
+      } catch (error) {
+        console.error("Bliss stats backend is unreachable", error);
         setStatus("Offline", "down");
+        if (generatedAtEl) generatedAtEl.textContent = "Backend unavailable";
+        setTimeout(refreshStats, 5000);
+        return;
+      }
+
+      try {
+        updateStats(nextStats);
+      } catch (error) {
+        console.error("Bliss stats dashboard failed to render", error);
+        setStatus("Live", "live");
+        if (generatedAtEl) generatedAtEl.textContent = "Live data received, dashboard render failed";
       } finally {
         setTimeout(refreshStats, 5000);
       }
@@ -1238,7 +1253,7 @@ const INDEX_HTML = `<!doctype html>
 
     function setStatus(text, state) {
       statusText.textContent = text;
-      statusEl.className = "status " + state;
+      statusEl.className = state ? "status " + state : "status";
     }
 
     function renderUsers(sightings) {
@@ -1312,11 +1327,11 @@ const INDEX_HTML = `<!doctype html>
       setText("activityChip", sightingsLast15m + " recent");
       if (generatedAtEl) generatedAtEl.textContent = stats.generatedAt ? "Updated " + formatTime(stats.generatedAt) : "Metrics pending";
 
-      renderServers(stats.topServers || []);
-      renderTopSeen(stats.topSeenPlayers || []);
-      renderHeatmap(stats.coordinateHeatmap || []);
-      renderRecentSightings(stats.recentSightings || []);
-      renderUsers(stats.recentSightings || []);
+      renderServers(array(stats.topServers));
+      renderTopSeen(array(stats.topSeenPlayers));
+      renderHeatmap(array(stats.coordinateHeatmap));
+      renderRecentSightings(array(stats.recentSightings));
+      renderUsers(array(stats.recentSightings));
       renderSnapshot(stats);
       renderActivity();
     }
@@ -1465,7 +1480,7 @@ const INDEX_HTML = `<!doctype html>
         count: 0
       }));
 
-      for (const sighting of stats.recentSightings || []) {
+      for (const sighting of array(stats.recentSightings)) {
         const timestamp = number(sighting.timestamp);
         const bucket = buckets.find(item => timestamp >= item.start && timestamp < item.end);
         if (bucket) bucket.count++;
@@ -1533,6 +1548,10 @@ const INDEX_HTML = `<!doctype html>
     function number(value, fallback = 0) {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function array(value) {
+      return Array.isArray(value) ? value : [];
     }
 
     function formatNumber(value) {
