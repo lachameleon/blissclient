@@ -10,56 +10,6 @@ interface ReporterIdentity {
   serverAddress: string;
 }
 
-interface MetricRow extends Record<string, SqlStorageValue> {
-  value: SqlStorageValue;
-}
-
-interface ServerMetricRow extends Record<string, SqlStorageValue> {
-  server_address: string;
-  sessions: number;
-}
-
-interface TopSeenPlayerRow extends Record<string, SqlStorageValue> {
-  seen_username: string;
-  seen_uuid: string;
-  sightings: number;
-  reporters: number;
-  servers: number;
-  latest_seen: number;
-  avg_distance: number;
-  avg_speed: number;
-  avg_health: number;
-  avg_ping: number | null;
-}
-
-interface RecentSightingRow extends Record<string, SqlStorageValue> {
-  timestamp: number;
-  reporter_username: string;
-  seen_username: string;
-  seen_uuid: string;
-  seen_server_address: string;
-  dimension: string;
-  x: number;
-  y: number;
-  z: number;
-  distance: number;
-  health: number;
-  max_health: number;
-  ping: number;
-  game_mode: string;
-  speed: number;
-}
-
-interface HeatmapMetricRow extends Record<string, SqlStorageValue> {
-  seen_server_address: string;
-  dimension: string;
-  heatmap_x: number;
-  heatmap_z: number;
-  samples: number;
-  players: number;
-  latest_seen: number;
-}
-
 interface PlayerSighting {
   seenUsername: string;
   seenUuid: string;
@@ -82,7 +32,41 @@ interface PlayerSighting {
   heatmapZ: number;
 }
 
+interface StoredSighting {
+  timestamp: number;
+  reporter: string;
+  reporterUuid: string;
+  reporterServerAddress: string;
+  username: string;
+  uuid: string;
+  serverAddress: string;
+  dimension: string;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+  health: number;
+  maxHealth: number;
+  ping: number;
+  gameMode: string;
+  sightingCount: number;
+  totalVisibleMs: number;
+  visibleMs: number;
+  averageDistance: number;
+  speed: number;
+  heatmapX: number;
+  heatmapZ: number;
+}
+
+interface StatsState {
+  sightings: StoredSighting[];
+  totalSightings: number;
+  updatedAt: number;
+}
+
+const MAX_STORED_SIGHTINGS = 200;
 const SIGHTING_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+const ACTIVE_REPORTER_WINDOW_MS = 5 * 60 * 1000;
 const HEATMAP_BIN_SIZE = 128;
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
@@ -96,8 +80,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/stats" || url.pathname === "/sightings") {
-      const id = env.STATS_ROOM.idFromName("global");
-      return env.STATS_ROOM.get(id).fetch(request);
+      return GLOBAL_STATS_ROOM.fetch(request);
     }
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -117,60 +100,14 @@ export default {
   }
 } satisfies ExportedHandler<Env>;
 
-export class StatsRoom extends DurableObject<Env> {
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-
-    this.ctx.storage.sql.exec(`
-      CREATE TABLE IF NOT EXISTS player_sightings (
-        id TEXT PRIMARY KEY,
-        timestamp INTEGER NOT NULL,
-        reporter_username TEXT NOT NULL,
-        reporter_uuid TEXT NOT NULL,
-        reporter_server_address TEXT NOT NULL,
-        seen_username TEXT NOT NULL,
-        seen_uuid TEXT NOT NULL,
-        seen_server_address TEXT NOT NULL,
-        dimension TEXT NOT NULL,
-        x REAL NOT NULL,
-        y REAL NOT NULL,
-        z REAL NOT NULL,
-        distance REAL NOT NULL,
-        health REAL NOT NULL,
-        max_health REAL NOT NULL,
-        ping INTEGER NOT NULL,
-        game_mode TEXT NOT NULL,
-        sighting_count INTEGER NOT NULL,
-        total_visible_ms INTEGER NOT NULL,
-        visible_ms INTEGER NOT NULL,
-        average_distance REAL NOT NULL DEFAULT 0,
-        speed REAL NOT NULL DEFAULT 0,
-        heatmap_x INTEGER NOT NULL DEFAULT 0,
-        heatmap_z INTEGER NOT NULL DEFAULT 0
-      )
-    `);
-    this.ensureColumn("player_sightings", "average_distance REAL NOT NULL DEFAULT 0");
-    this.ensureColumn("player_sightings", "speed REAL NOT NULL DEFAULT 0");
-    this.ensureColumn("player_sightings", "heatmap_x INTEGER NOT NULL DEFAULT 0");
-    this.ensureColumn("player_sightings", "heatmap_z INTEGER NOT NULL DEFAULT 0");
-    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_timestamp ON player_sightings (timestamp)");
-    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_seen_uuid ON player_sightings (seen_uuid)");
-    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_heatmap ON player_sightings (seen_server_address, dimension, heatmap_x, heatmap_z)");
-  }
-
-  private ensureColumn(table: string, columnSql: string): void {
-    try {
-      this.ctx.storage.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`);
-    } catch {
-      // Existing Durable Object instances may already have the column.
-    }
-  }
+class StatsService {
+  private state: StatsState = emptyState();
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/stats") {
-      return Response.json(this.dashboardStats(), {
+      return Response.json(this.dashboardStats(this.state), {
         headers: {
           "cache-control": "no-store"
         }
@@ -206,217 +143,173 @@ export class StatsRoom extends DurableObject<Env> {
     const sighting = sanitizePlayerSighting(payload, reporter.serverAddress);
     if (!sighting) return new Response(null, { status: 204, headers: CORS_HEADERS });
 
-    this.storePlayerSighting(reporter, sighting, Date.now());
+    try {
+      await this.storePlayerSighting(reporter, sighting, Date.now());
+    } catch (error) {
+      console.error("Failed to store Bliss sighting", error);
+    }
+
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  private storePlayerSighting(reporter: ReporterIdentity, sighting: PlayerSighting, timestamp: number): void {
-    this.ctx.storage.sql.exec(
-      `INSERT INTO player_sightings (
-        id,
-        timestamp,
-        reporter_username,
-        reporter_uuid,
-        reporter_server_address,
-        seen_username,
-        seen_uuid,
-        seen_server_address,
-        dimension,
-        x,
-        y,
-        z,
-        distance,
-        health,
-        max_health,
-        ping,
-        game_mode,
-        sighting_count,
-        total_visible_ms,
-        visible_ms,
-        average_distance,
-        speed,
-        heatmap_x,
-        heatmap_z
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      crypto.randomUUID(),
+  private async storePlayerSighting(reporter: ReporterIdentity, sighting: PlayerSighting, timestamp: number): Promise<void> {
+    const state = this.state;
+    const cutoff = timestamp - SIGHTING_RETENTION_MS;
+    const stored: StoredSighting = {
       timestamp,
-      reporter.username,
-      reporter.uuid,
-      reporter.serverAddress,
-      sighting.seenUsername,
-      sighting.seenUuid,
-      sighting.serverAddress,
-      sighting.dimension,
-      sighting.x,
-      sighting.y,
-      sighting.z,
-      sighting.distance,
-      sighting.health,
-      sighting.maxHealth,
-      sighting.ping,
-      sighting.gameMode,
-      sighting.sightingCount,
-      sighting.totalVisibleMs,
-      sighting.visibleMs,
-      sighting.averageDistance,
-      sighting.speed,
-      sighting.heatmapX,
-      sighting.heatmapZ
-    );
-    this.ctx.storage.sql.exec(
-      "DELETE FROM player_sightings WHERE timestamp < ?",
-      timestamp - SIGHTING_RETENTION_MS
-    );
+      reporter: reporter.username,
+      reporterUuid: reporter.uuid,
+      reporterServerAddress: reporter.serverAddress,
+      username: sighting.seenUsername,
+      uuid: sighting.seenUuid,
+      serverAddress: sighting.serverAddress,
+      dimension: sighting.dimension,
+      x: sighting.x,
+      y: sighting.y,
+      z: sighting.z,
+      distance: sighting.distance,
+      health: sighting.health,
+      maxHealth: sighting.maxHealth,
+      ping: sighting.ping,
+      gameMode: sighting.gameMode,
+      sightingCount: sighting.sightingCount,
+      totalVisibleMs: sighting.totalVisibleMs,
+      visibleMs: sighting.visibleMs,
+      averageDistance: sighting.averageDistance,
+      speed: sighting.speed,
+      heatmapX: sighting.heatmapX,
+      heatmapZ: sighting.heatmapZ
+    };
+
+    const nextState: StatsState = {
+      sightings: [stored, ...state.sightings.filter(item => item.timestamp >= cutoff)].slice(0, MAX_STORED_SIGHTINGS),
+      totalSightings: state.totalSightings + 1,
+      updatedAt: timestamp
+    };
+
+    this.state = nextState;
   }
 
-  private dashboardStats(): DashboardStats {
+  private dashboardStats(state: StatsState): DashboardStats {
     const now = Date.now();
-    const activeSince = now - 5 * 60 * 1000;
-    const latestSightingAt = this.firstNumber("SELECT MAX(timestamp) AS value FROM player_sightings");
+    const sightings = state.sightings;
+    const activeSince = now - ACTIVE_REPORTER_WINDOW_MS;
+    const latestSightingAt = maxNumber(sightings.map(sighting => sighting.timestamp));
 
     return {
       generatedAt: now,
-      activeReporters: this.firstNumber("SELECT COUNT(DISTINCT reporter_uuid) AS value FROM player_sightings WHERE timestamp >= ?", activeSince),
-      activeServers: this.firstNumber("SELECT COUNT(DISTINCT reporter_server_address) AS value FROM player_sightings WHERE timestamp >= ?", activeSince),
-      uniqueReporters: this.firstNumber("SELECT COUNT(DISTINCT reporter_uuid) AS value FROM player_sightings"),
-      uniqueServers: this.firstNumber("SELECT COUNT(DISTINCT reporter_server_address) AS value FROM player_sightings"),
-      reporterServerPairs: this.firstNumber("SELECT COUNT(DISTINCT reporter_uuid || ':' || reporter_server_address) AS value FROM player_sightings"),
-      totalSightings: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings"),
-      sightingsLast15m: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings WHERE timestamp >= ?", now - 15 * 60 * 1000),
-      sightingsLastHour: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings WHERE timestamp >= ?", now - 60 * 60 * 1000),
-      uniqueSeenPlayers: this.firstNumber("SELECT COUNT(DISTINCT seen_uuid) AS value FROM player_sightings"),
-      activeReportersLastHour: this.firstNumber("SELECT COUNT(DISTINCT reporter_uuid) AS value FROM player_sightings WHERE timestamp >= ?", now - 60 * 60 * 1000),
-      busiestServer: this.firstString("SELECT reporter_server_address AS value FROM player_sightings GROUP BY reporter_server_address ORDER BY COUNT(*) DESC, MAX(timestamp) DESC LIMIT 1"),
+      activeReporters: uniqueCount(sightings.filter(sighting => sighting.timestamp >= activeSince), sighting => sighting.reporterUuid),
+      activeServers: uniqueCount(sightings.filter(sighting => sighting.timestamp >= activeSince), sighting => sighting.reporterServerAddress),
+      uniqueReporters: uniqueCount(sightings, sighting => sighting.reporterUuid),
+      uniqueServers: uniqueCount(sightings, sighting => sighting.reporterServerAddress),
+      reporterServerPairs: uniqueCount(sightings, sighting => sighting.reporterUuid + ":" + sighting.reporterServerAddress),
+      totalSightings: state.totalSightings,
+      sightingsLast15m: sightings.filter(sighting => sighting.timestamp >= now - 15 * 60 * 1000).length,
+      sightingsLastHour: sightings.filter(sighting => sighting.timestamp >= now - 60 * 60 * 1000).length,
+      uniqueSeenPlayers: uniqueCount(sightings, sighting => sighting.uuid),
+      activeReportersLastHour: uniqueCount(sightings.filter(sighting => sighting.timestamp >= now - 60 * 60 * 1000), sighting => sighting.reporterUuid),
+      busiestServer: this.busiestServer(sightings),
       latestSightingAt,
-      topServers: this.topServers(),
-      topSeenPlayers: this.topSeenPlayers(),
-      recentSightings: this.recentSightings(),
-      coordinateHeatmap: this.coordinateHeatmap()
+      topServers: this.topServers(sightings),
+      topSeenPlayers: this.topSeenPlayers(sightings),
+      recentSightings: this.recentSightings(sightings),
+      coordinateHeatmap: this.coordinateHeatmap(sightings)
     };
   }
 
-  private firstNumber(query: string, ...params: SqlStorageValue[]): number {
-    const row = [...this.ctx.storage.sql.exec<MetricRow>(query, ...params)][0];
-    const value = row?.value;
-    return typeof value === "number" && Number.isFinite(value) ? value : Number(value ?? 0) || 0;
+  private busiestServer(sightings: StoredSighting[]): string {
+    const servers = groupSightings(sightings, sighting => sighting.reporterServerAddress);
+    const busiest = [...servers.entries()]
+      .map(([serverAddress, items]) => ({ serverAddress, count: items.length, latest: maxNumber(items.map(item => item.timestamp)) }))
+      .sort((a, b) => b.count - a.count || b.latest - a.latest)[0];
+    return busiest?.serverAddress ?? "No server data yet";
   }
 
-  private firstString(query: string, ...params: SqlStorageValue[]): string {
-    const row = [...this.ctx.storage.sql.exec<MetricRow>(query, ...params)][0];
-    return typeof row?.value === "string" ? row.value : "No server data yet";
+  private topServers(sightings: StoredSighting[]): DashboardStats["topServers"] {
+    const activeSince = Date.now() - ACTIVE_REPORTER_WINDOW_MS;
+    return [...groupSightings(sightings, sighting => sighting.reporterServerAddress).entries()]
+      .map(([serverAddress, items]) => ({
+        serverAddress,
+        sessions: items.length,
+        online: uniqueCount(items.filter(item => item.timestamp >= activeSince), item => item.reporterUuid),
+        latest: maxNumber(items.map(item => item.timestamp))
+      }))
+      .sort((a, b) => b.sessions - a.sessions || b.latest - a.latest)
+      .slice(0, 6)
+      .map(({ serverAddress, sessions, online }) => ({ serverAddress, sessions, online }));
   }
 
-  private topServers(): Array<{ serverAddress: string; sessions: number; online: number }> {
-    const activeSince = Date.now() - 5 * 60 * 1000;
-    const onlineCounts = new Map<string, number>();
-    const activeRows = [...this.ctx.storage.sql.exec<ServerMetricRow>(
-      `SELECT reporter_server_address AS server_address, COUNT(DISTINCT reporter_uuid) AS sessions
-      FROM player_sightings
-      WHERE timestamp >= ?
-      GROUP BY reporter_server_address`,
-      activeSince
-    )];
+  private topSeenPlayers(sightings: StoredSighting[]): DashboardStats["topSeenPlayers"] {
+    return [...groupSightings(sightings, sighting => sighting.uuid + ":" + sighting.username).values()]
+      .map(items => {
+        const latest = items.reduce((best, item) => item.timestamp > best.timestamp ? item : best, items[0]);
+        const pings = items.filter(item => item.ping >= 0);
 
-    for (const row of activeRows) {
-      onlineCounts.set(row.server_address, Number(row.sessions ?? 0));
-    }
-
-    const rows = [...this.ctx.storage.sql.exec<ServerMetricRow>(
-      "SELECT reporter_server_address AS server_address, COUNT(*) AS sessions FROM player_sightings GROUP BY reporter_server_address ORDER BY sessions DESC, MAX(timestamp) DESC LIMIT 6"
-    )];
-
-    return rows.map(row => ({
-      serverAddress: row.server_address,
-      sessions: Number(row.sessions ?? 0),
-      online: onlineCounts.get(row.server_address) ?? 0
-    }));
+        return {
+          username: latest.username,
+          uuid: latest.uuid,
+          sightings: items.length,
+          reporters: uniqueCount(items, item => item.reporterUuid),
+          servers: uniqueCount(items, item => item.serverAddress),
+          latestSeen: latest.timestamp,
+          avgDistance: average(items.map(item => item.distance)),
+          avgSpeed: average(items.map(item => item.speed)),
+          avgHealth: average(items.map(item => item.health)),
+          avgPing: average(pings.map(item => item.ping))
+        };
+      })
+      .sort((a, b) => b.sightings - a.sightings || b.latestSeen - a.latestSeen)
+      .slice(0, 10);
   }
 
-  private topSeenPlayers(): Array<{ username: string; uuid: string; sightings: number; reporters: number; servers: number; latestSeen: number; avgDistance: number; avgSpeed: number; avgHealth: number; avgPing: number }> {
-    const rows = [...this.ctx.storage.sql.exec<TopSeenPlayerRow>(
-      `SELECT
-        seen_username,
-        seen_uuid,
-        COUNT(*) AS sightings,
-        COUNT(DISTINCT reporter_uuid) AS reporters,
-        COUNT(DISTINCT seen_server_address) AS servers,
-        MAX(timestamp) AS latest_seen,
-        AVG(distance) AS avg_distance,
-        AVG(speed) AS avg_speed,
-        AVG(health) AS avg_health,
-        AVG(CASE WHEN ping >= 0 THEN ping END) AS avg_ping
-      FROM player_sightings
-      GROUP BY seen_uuid, seen_username
-      ORDER BY sightings DESC, latest_seen DESC
-      LIMIT 10`
-    )];
-
-    return rows.map(row => ({
-      username: row.seen_username,
-      uuid: row.seen_uuid,
-      sightings: Number(row.sightings ?? 0),
-      reporters: Number(row.reporters ?? 0),
-      servers: Number(row.servers ?? 0),
-      latestSeen: Number(row.latest_seen ?? 0),
-      avgDistance: Number(row.avg_distance ?? 0),
-      avgSpeed: Number(row.avg_speed ?? 0),
-      avgHealth: Number(row.avg_health ?? 0),
-      avgPing: Number(row.avg_ping ?? 0)
-    }));
+  private recentSightings(sightings: StoredSighting[]): DashboardStats["recentSightings"] {
+    return [...sightings]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 12)
+      .map(sighting => ({
+        timestamp: sighting.timestamp,
+        reporter: sighting.reporter,
+        username: sighting.username,
+        uuid: sighting.uuid,
+        serverAddress: sighting.serverAddress,
+        dimension: sighting.dimension,
+        x: sighting.x,
+        y: sighting.y,
+        z: sighting.z,
+        distance: sighting.distance,
+        health: sighting.health,
+        maxHealth: sighting.maxHealth,
+        ping: sighting.ping,
+        gameMode: sighting.gameMode,
+        speed: sighting.speed
+      }));
   }
 
-  private recentSightings(): Array<{ timestamp: number; reporter: string; username: string; uuid: string; serverAddress: string; dimension: string; x: number; y: number; z: number; distance: number; health: number; maxHealth: number; ping: number; gameMode: string; speed: number }> {
-    const rows = [...this.ctx.storage.sql.exec<RecentSightingRow>(
-      `SELECT timestamp, reporter_username, seen_username, seen_uuid, seen_server_address, dimension, x, y, z, distance, health, max_health, ping, game_mode, speed
-      FROM player_sightings
-      ORDER BY timestamp DESC
-      LIMIT 12`
-    )];
+  private coordinateHeatmap(sightings: StoredSighting[]): DashboardStats["coordinateHeatmap"] {
+    return [...groupSightings(sightings, sighting => [sighting.serverAddress, sighting.dimension, sighting.heatmapX, sighting.heatmapZ].join("|")).values()]
+      .map(items => {
+        const latest = items.reduce((best, item) => item.timestamp > best.timestamp ? item : best, items[0]);
 
-    return rows.map(row => ({
-      timestamp: Number(row.timestamp ?? 0),
-      reporter: row.reporter_username,
-      username: row.seen_username,
-      uuid: row.seen_uuid,
-      serverAddress: row.seen_server_address,
-      dimension: row.dimension,
-      x: Number(row.x ?? 0),
-      y: Number(row.y ?? 0),
-      z: Number(row.z ?? 0),
-      distance: Number(row.distance ?? 0),
-      health: Number(row.health ?? 0),
-      maxHealth: Number(row.max_health ?? 0),
-      ping: Number(row.ping ?? -1),
-      gameMode: row.game_mode,
-      speed: Number(row.speed ?? 0)
-    }));
+        return {
+          serverAddress: latest.serverAddress,
+          dimension: latest.dimension,
+          x: latest.heatmapX,
+          z: latest.heatmapZ,
+          samples: items.length,
+          players: uniqueCount(items, item => item.uuid),
+          latestSeen: latest.timestamp
+        };
+      })
+      .sort((a, b) => b.samples - a.samples || b.latestSeen - a.latestSeen)
+      .slice(0, 24);
   }
+}
 
-  private coordinateHeatmap(): Array<{ serverAddress: string; dimension: string; x: number; z: number; samples: number; players: number; latestSeen: number }> {
-    const rows = [...this.ctx.storage.sql.exec<HeatmapMetricRow>(
-      `SELECT
-        seen_server_address,
-        dimension,
-        heatmap_x,
-        heatmap_z,
-        COUNT(*) AS samples,
-        COUNT(DISTINCT seen_uuid) AS players,
-        MAX(timestamp) AS latest_seen
-      FROM player_sightings
-      GROUP BY seen_server_address, dimension, heatmap_x, heatmap_z
-      ORDER BY samples DESC, latest_seen DESC
-      LIMIT 24`
-    )];
+const GLOBAL_STATS_ROOM = new StatsService();
 
-    return rows.map(row => ({
-      serverAddress: row.seen_server_address,
-      dimension: row.dimension,
-      x: Number(row.heatmap_x ?? 0),
-      z: Number(row.heatmap_z ?? 0),
-      samples: Number(row.samples ?? 0),
-      players: Number(row.players ?? 0),
-      latestSeen: Number(row.latest_seen ?? 0)
-    }));
+export class StatsRoom extends DurableObject<Env> {
+  async fetch(request: Request): Promise<Response> {
+    return GLOBAL_STATS_ROOM.fetch(request);
   }
 }
 
@@ -1592,3 +1485,58 @@ const INDEX_HTML = `<!doctype html>
   </script>
 </body>
 </html>`;
+
+function emptyState(): StatsState {
+  return {
+    sightings: [],
+    totalSightings: 0,
+    updatedAt: 0
+  };
+}
+
+function maxNumber(values: number[]): number {
+  let max = 0;
+  for (const value of values) {
+    if (Number.isFinite(value) && value > max) max = value;
+  }
+  return max;
+}
+
+function average(values: number[]): number {
+  let total = 0;
+  let count = 0;
+
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    total += value;
+    count++;
+  }
+
+  return count ? total / count : 0;
+}
+
+function uniqueCount<T>(items: T[], key: (item: T) => string): number {
+  const values = new Set<string>();
+  for (const item of items) {
+    const value = key(item);
+    if (value) values.add(value);
+  }
+  return values.size;
+}
+
+function groupSightings(sightings: StoredSighting[], key: (sighting: StoredSighting) => string): Map<string, StoredSighting[]> {
+  const groups = new Map<string, StoredSighting[]>();
+
+  for (const sighting of sightings) {
+    const groupKey = key(sighting);
+    if (!groupKey) continue;
+    const group = groups.get(groupKey);
+    if (group) {
+      group.push(sighting);
+    } else {
+      groups.set(groupKey, [sighting]);
+    }
+  }
+
+  return groups;
+}
