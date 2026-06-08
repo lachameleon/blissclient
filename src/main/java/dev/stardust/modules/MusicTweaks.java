@@ -3,23 +3,23 @@ package dev.stardust.modules;
 import java.util.List;
 import java.util.ArrayList;
 import meteordevelopment.meteorclient.systems.modules.Categories;
-import net.minecraft.text.Text;
 import javax.annotation.Nullable;
 import dev.stardust.util.StardustUtil;
-import net.minecraft.sound.MusicSound;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.client.MinecraftClient;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
+import net.minecraft.sounds.Music;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Mth;
 import io.netty.util.internal.ThreadLocalRandom;
-import net.minecraft.client.sound.SoundInstance;
 import meteordevelopment.meteorclient.settings.*;
 import dev.stardust.mixin.accessor.MusicTrackerAccessor;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.mixininterface.IChatHud;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
-import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
 
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
@@ -761,7 +761,7 @@ public class MusicTweaks extends Module {
 
 
     // See MinecraftClientMixin.java
-    public MusicSound getType() {
+    public Music getType() {
         if (currentType != null) return currentType;
 
         int min;
@@ -780,7 +780,7 @@ public class MusicTweaks extends Module {
 
         // It doesn't matter which SoundEvents.MUSIC_??? we return since the WeightedSoundSet is overwritten directly now.
         // actually I lied tho don't use the music disc events, or it won't work (see WeightedSoundSetMixin.java)
-        MusicSound type = new MusicSound(SoundEvents.MUSIC_GAME, min, ThreadLocalRandom.current().nextInt(min, max), false);
+        Music type = new Music(SoundEvents.MUSIC_GAME, min, ThreadLocalRandom.current().nextInt(min, max), false);
 
         currentType = type;
         return type;
@@ -977,7 +977,7 @@ public class MusicTweaks extends Module {
         if (lastDirection == null) {
             lastDirection = PitchDirection.Descending;
             float intensity = -(pitchIntensity.get() / 10000f);
-            return MathHelper.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
+            return Mth.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
         }
 
         switch (lastDirection) { // Lmao
@@ -991,7 +991,7 @@ public class MusicTweaks extends Module {
                     intensity = -(pitchIntensity.get() / 10000f);
                     lastDirection = PitchDirection.Descending;
                 }
-                return MathHelper.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
+                return Mth.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
             }
             case Descending -> {
                 float weightedChance = ThreadLocalRandom.current().nextFloat(0, 1);
@@ -1003,7 +1003,7 @@ public class MusicTweaks extends Module {
                     intensity = pitchIntensity.get() / 10000f;
                     lastDirection = PitchDirection.Ascending;
                 }
-                return MathHelper.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
+                return Mth.clamp(currentPitch + (currentPitch * intensity), -5f, 5f);
             }
         }
         return currentPitch;
@@ -1012,8 +1012,8 @@ public class MusicTweaks extends Module {
     public void sendNowPlayingMessage(String songName) {
         if (mc.player == null) return;
         String[] pieces = songName.split(" - ");
-        ((IChatHud) mc.inGameHud.getChatHud()).meteor$add(
-            Text.of("§8<"+rcc+"§o✨§r§8> §2§oNow Playing§r§8: §7§o"+pieces[0]+" §8- "+rcc+"§o"+pieces[1]+"§r§8."),
+        ((IChatHud) mc.gui.getChat()).meteor$add(
+            Component.nullToEmpty("§8<"+rcc+"§o✨§r§8> §2§oNow Playing§r§8: §7§o"+pieces[0]+" §8- "+rcc+"§o"+pieces[1]+"§r§8."),
             songName.hashCode()
         );
     }
@@ -1025,7 +1025,7 @@ public class MusicTweaks extends Module {
     }
 
     // See SoundSystemMixin.java
-    public MinecraftClient getClient() { return mc; }
+    public Minecraft getClient() { return mc; }
     public boolean shouldFadeOut() { return fadeOut.get(); }
     public boolean randomPitch() { return randomPitch.get(); }
     public boolean trippyPitch() { return trippyPitchSetting.get(); }
@@ -1047,7 +1047,7 @@ public class MusicTweaks extends Module {
     @Nullable
     private String currentSong = null;
     @Nullable
-    private MusicSound currentType = null;
+    private Music currentType = null;
     @Nullable
     private PitchDirection lastDirection = null;
 
@@ -1057,44 +1057,44 @@ public class MusicTweaks extends Module {
     public void onActivate() {
         if (!startOnEnable.get()) return;
 
-        MusicSound type = getType();
-        if (((MusicTrackerAccessor) mc.getMusicTracker()).getCurrent() == null) mc.getMusicTracker().play(type);
+        Music type = getType();
+        if (((MusicTrackerAccessor) mc.getMusicManager()).getCurrent() == null) mc.getMusicManager().startPlaying(type);
     }
 
     @Override
     public void onDeactivate() {
-        if (stopOnDisable.get()) mc.getMusicTracker().stop();
+        if (stopOnDisable.get()) mc.getMusicManager().stopPlaying();
         nullifyCurrentType();
     }
 
     @EventHandler
     private void onGameJoin(GameJoinedEvent event) {
-        SoundInstance instance = ((MusicTrackerAccessor) mc.getMusicTracker()).getCurrent();
+        SoundInstance instance = ((MusicTrackerAccessor) mc.getMusicManager()).getCurrent();
         if (instance != null) {
-            MusicSound type = getType();
-            if (type != mc.getMusicInstance()) {
-                mc.getMusicTracker().stop();
-                mc.getMusicTracker().play(type);
+            Music type = getType();
+            if (type != mc.getSituationalMusic()) {
+                mc.getMusicManager().stopPlaying();
+                mc.getMusicManager().startPlaying(type);
             }
         }
 
-        if (mc.world != null) {
-            lastDim = mc.world.getDimensionEntry().getIdAsString();
+        if (mc.level != null) {
+            lastDim = mc.level.dimensionTypeRegistration().getRegisteredName();
         }
     }
 
     @EventHandler
     private void onDimensionChange(PacketEvent.Receive event) {
-        if (mc.world == null) return;
-        if (!(event.packet instanceof PlayerRespawnS2CPacket)) return;
+        if (mc.level == null) return;
+        if (!(event.packet instanceof ClientboundRespawnPacket)) return;
 
-        String dimensionType = mc.world.getDimensionEntry().getIdAsString();
+        String dimensionType = mc.level.dimensionTypeRegistration().getRegisteredName();
         if (lastDim != null) {
             if (!dimensionType.equals(lastDim)) {
-                MusicSound type = getType();
+                Music type = getType();
 
-                mc.getMusicTracker().stop();
-                mc.getMusicTracker().play(type);
+                mc.getMusicManager().stopPlaying();
+                mc.getMusicManager().startPlaying(type);
                 lastDim = dimensionType;
             }
         }

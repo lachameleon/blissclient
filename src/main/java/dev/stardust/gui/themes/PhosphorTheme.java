@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class PhosphorTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final PhosphorTheme INSTANCE = new PhosphorTheme();
 
+    public PhosphorTheme() {
+        super("Phosphor");
+    }
+
     @Override
     public String getName() {
         return "Phosphor";

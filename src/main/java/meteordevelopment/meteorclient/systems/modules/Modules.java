@@ -5,24 +5,14 @@
 
 package meteordevelopment.meteorclient.systems.modules;
 
-import dev.stardust.modules.AdBlocker;
-import dev.stardust.modules.AutoDoors;
-import dev.stardust.modules.BannerData;
-import dev.stardust.modules.DiscordChatIntegration;
-import dev.stardust.modules.Loadouts;
-import dev.stardust.modules.LoreLocator;
-import dev.stardust.modules.Minesweeper;
-import dev.stardust.modules.MusicTweaks;
-import dev.stardust.modules.RoadTrip;
-import dev.stardust.modules.SignatureSign;
-import dev.stardust.modules.StashBrander;
+import dev.stardust.modules.*;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.meteor.ActiveModulesChangedEvent;
-import meteordevelopment.meteorclient.events.meteor.KeyEvent;
+import meteordevelopment.meteorclient.events.meteor.KeyInputEvent;
 import meteordevelopment.meteorclient.events.meteor.ModuleBindChangedEvent;
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
 import meteordevelopment.meteorclient.pathing.BaritoneUtils;
@@ -50,10 +40,10 @@ import meteordevelopment.meteorclient.utils.misc.input.Input;
 import meteordevelopment.meteorclient.utils.misc.input.KeyAction;
 import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.EventPriority;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.util.Pair;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.util.Tuple;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -109,7 +99,8 @@ public class Modules extends System<Modules> {
     }
 
     public static void registerCategory(Category category) {
-        if (!Categories.REGISTERING) throw new RuntimeException("Modules.registerCategory - Cannot register category outside of onRegisterCategories callback.");
+        if (!Categories.REGISTERING)
+            throw new RuntimeException("Modules.registerCategory - Cannot register category outside of onRegisterCategories callback.");
 
         CATEGORIES.add(category);
     }
@@ -144,7 +135,7 @@ public class Modules extends System<Modules> {
     }
 
     public List<Module> getGroup(Category category) {
-        return groups.computeIfAbsent(category, category1 -> new ArrayList<>());
+        return groups.computeIfAbsent(category, _ -> new ArrayList<>());
     }
 
     public Collection<Module> getAll() {
@@ -160,8 +151,8 @@ public class Modules extends System<Modules> {
         return active;
     }
 
-    public List<Pair<Module, String>> searchTitles(String text) {
-        Map<Pair<Module, String>, Integer> modules = new HashMap<>();
+    public List<Tuple<Module, String>> searchTitles(String text) {
+        Map<Tuple<Module, String>, Integer> modules = new HashMap<>();
 
         for (Module module : this.moduleInstances.values()) {
             if (Config.get().hiddenModules.get().contains(module)) continue;
@@ -179,10 +170,10 @@ public class Modules extends System<Modules> {
                 }
             }
 
-            modules.put(new Pair<>(module, title), score);
+            modules.put(new Tuple<>(module, title), score);
         }
 
-        List<Pair<Module, String>> l = new ArrayList<>(modules.keySet());
+        List<Tuple<Module, String>> l = new ArrayList<>(modules.keySet());
         l.sort(Comparator.comparingInt(modules::get));
 
         return l;
@@ -243,7 +234,7 @@ public class Modules extends System<Modules> {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    private void onKeyBinding(KeyEvent event) {
+    private void onKeyBinding(KeyInputEvent event) {
         if (event.action == KeyAction.Release && onBinding(true, event.key(), event.modifiers())) event.cancel();
     }
 
@@ -265,12 +256,10 @@ public class Modules extends System<Modules> {
         if (moduleToBind.keybind.canBindTo(isKey, value, modifiers)) {
             moduleToBind.keybind.set(isKey, value, modifiers);
             moduleToBind.info("Bound to (highlight)%s(default).", moduleToBind.keybind);
-        }
-        else if (value == GLFW.GLFW_KEY_ESCAPE) {
+        } else if (value == GLFW.GLFW_KEY_ESCAPE) {
             moduleToBind.keybind.set(Keybind.none());
             moduleToBind.info("Removed bind.");
-        }
-        else return false;
+        } else return false;
 
         MeteorClient.EVENT_BUS.post(ModuleBindChangedEvent.get(moduleToBind));
         moduleToBind = null;
@@ -279,7 +268,7 @@ public class Modules extends System<Modules> {
     }
 
     @EventHandler(priority = EventPriority.HIGH)
-    private void onKey(KeyEvent event) {
+    private void onKey(KeyInputEvent event) {
         if (event.action == KeyAction.Repeat) return;
         onAction(true, event.key(), event.modifiers(), event.action == KeyAction.Press);
     }
@@ -291,7 +280,7 @@ public class Modules extends System<Modules> {
     }
 
     private void onAction(boolean isKey, int value, int modifiers, boolean isPress) {
-        if (mc.currentScreen != null || Input.isKeyPressed(GLFW.GLFW_KEY_F3)) return;
+        if (mc.screen != null || Input.isKeyPressed(GLFW.GLFW_KEY_F3)) return;
 
         for (Module module : moduleInstances.values()) {
             if (module.keybind.matches(isKey, value, modifiers) && (isPress || (module.toggleOnBindRelease && module.isActive()))) {
@@ -348,12 +337,12 @@ public class Modules extends System<Modules> {
     }
 
     @Override
-    public NbtCompound toTag() {
-        NbtCompound tag = new NbtCompound();
+    public CompoundTag toTag() {
+        CompoundTag tag = new CompoundTag();
 
-        NbtList modulesTag = new NbtList();
+        ListTag modulesTag = new ListTag();
         for (Module module : getAll()) {
-            NbtCompound moduleTag = module.toTag();
+            CompoundTag moduleTag = module.toTag();
             if (moduleTag != null) modulesTag.add(moduleTag);
         }
         tag.put("modules", modulesTag);
@@ -362,13 +351,13 @@ public class Modules extends System<Modules> {
     }
 
     @Override
-    public Modules fromTag(NbtCompound tag) {
+    public Modules fromTag(CompoundTag tag) {
         disableAll();
 
-        NbtList modulesTag = tag.getListOrEmpty("modules");
-        for (NbtElement moduleTagI : modulesTag) {
-            NbtCompound moduleTag = (NbtCompound) moduleTagI;
-            Module module = get(moduleTag.getString("name", ""));
+        ListTag modulesTag = tag.getListOrEmpty("modules");
+        for (Tag moduleTagI : modulesTag) {
+            CompoundTag moduleTag = (CompoundTag) moduleTagI;
+            Module module = get(moduleTag.getStringOr("name", ""));
             if (module != null) module.fromTag(moduleTag);
         }
 
@@ -465,14 +454,11 @@ public class Modules extends System<Modules> {
         add(new NoMiningTrace());
         add(new NoRotate());
         add(new NoStatusEffects());
-        add(new OffhandCrash());
         add(new Portals());
         add(new PotionSaver());
         add(new Reach());
         add(new Rotation());
         add(new SpeedMine());
-        add(new Loadouts());
-        add(new StashBrander());
     }
 
     private void initMovement() {
@@ -512,7 +498,6 @@ public class Modules extends System<Modules> {
     private void initRender() {
         add(new BetterTab());
         add(new BetterTooltips());
-        add(new LoreLocator());
         add(new BlockESP());
         add(new BlockSelection());
         add(new Blur());
@@ -524,18 +509,18 @@ public class Modules extends System<Modules> {
         add(new CityESP());
         add(new EntityOwner());
         add(new ESP());
-        add(new Grid());
         add(new Freecam());
         add(new FreeLook());
         add(new Fullbright());
+        add(new Grid());
         add(new HandView());
         add(new HoleESP());
         add(new ItemPhysics());
         add(new ItemHighlight());
         add(new LightOverlay());
-        add(new TimeChanger());
-        add(new ZoomPlus());
-        add(new Tracers());
+        add(new LogoutSpots());
+        add(new Marker());
+        add(new Nametags());
         add(new NoRender());
         add(new PopChams());
         add(new StorageESP());
@@ -547,16 +532,16 @@ public class Modules extends System<Modules> {
         add(new VoidESP());
         add(new WallHack());
         add(new WaypointsModule());
+        add(new WeatherChanger());
         add(new Xray());
         add(new Zoom());
+        add(new ZoomPlus());
     }
 
     private void initWorld() {
         add(new Ambience());
-        add(new BannerData());
         add(new AutoBreed());
         add(new AutoBrewer());
-        add(new AutoDoors());
         add(new AutoMount());
         add(new AutoNametag());
         add(new AutoShearer());
@@ -569,16 +554,14 @@ public class Modules extends System<Modules> {
         add(new Flamethrower());
         add(new HighwayBuilder());
         add(new LiquidFiller());
-        add(new MountBypass());
+        add(new DoubleDoorsInteract());
         add(new NoGhostBlocks());
         add(new Nuker());
         add(new PacketMine());
         add(new StashFinder());
         add(new SpawnProofer());
-        add(new SignatureSign());
         add(new Timer());
         add(new VeinMiner());
-        add(new DoubleDoorsInteract());
 
         if (BaritoneUtils.IS_AVAILABLE) {
             add(new Excavator());
@@ -587,16 +570,21 @@ public class Modules extends System<Modules> {
     }
 
     private void initMisc() {
-        add(new AdBlocker());
         add(new AntiPacketKick());
+        add(new AdBlocker());
         add(new AutoReconnect());
         add(new AutoSleep());
         add(new BetterBeacons());
         add(new BetterChat());
+        add(new AutoDoors());
+        add(new BannerData());
+        add(new BlissChat());
         add(new BookBot());
         add(new DiscordChatIntegration());
         add(new DiscordPresence());
         add(new InventoryTweaks());
+        add(new Loadouts());
+        add(new LoreLocator());
         add(new MessageAura());
         add(new Minesweeper());
         add(new MusicTweaks());
@@ -606,8 +594,12 @@ public class Modules extends System<Modules> {
         add(new PacketLogger());
         add(new RoadTrip());
         add(new ServerSpoof());
+        add(new SignHistorian());
+        add(new SignatureSign());
         add(new SoundBlocker());
         add(new Spam());
+        add(new StashBrander());
         add(new Swarm());
+        add(new WaxAura());
     }
 }

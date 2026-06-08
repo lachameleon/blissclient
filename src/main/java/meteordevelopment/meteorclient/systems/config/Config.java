@@ -1,114 +1,45 @@
+/*
+ * This file is part of the Meteor Client distribution (https://github.com/MeteorDevelopment/meteor-client).
+ * Copyright (c) Meteor Development.
+ */
+
 package meteordevelopment.meteorclient.systems.config;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import dev.stardust.modules.AdBlocker;
-import dev.stardust.modules.AutoDoors;
-import dev.stardust.modules.BannerData;
-import dev.stardust.modules.DiscordChatIntegration;
-import dev.stardust.modules.Loadouts;
-import dev.stardust.modules.LoreLocator;
-import dev.stardust.modules.Minesweeper;
-import dev.stardust.modules.MusicTweaks;
-import dev.stardust.modules.RoadTrip;
-import dev.stardust.modules.SignatureSign;
-import dev.stardust.modules.StashBrander;
+import dev.stardust.modules.*;
 import meteordevelopment.meteorclient.MeteorClient;
-import static meteordevelopment.meteorclient.MeteorClient.mc;
 import meteordevelopment.meteorclient.renderer.Fonts;
 import meteordevelopment.meteorclient.renderer.text.FontFace;
-import meteordevelopment.meteorclient.settings.BoolSetting;
-import meteordevelopment.meteorclient.settings.ColorSetting;
-import meteordevelopment.meteorclient.settings.DoubleSetting;
-import meteordevelopment.meteorclient.settings.FontFaceSetting;
-import meteordevelopment.meteorclient.settings.IntSetting;
-import meteordevelopment.meteorclient.settings.ModuleListSetting;
-import meteordevelopment.meteorclient.settings.Setting;
-import meteordevelopment.meteorclient.settings.SettingGroup;
-import meteordevelopment.meteorclient.settings.Settings;
-import meteordevelopment.meteorclient.settings.StringListSetting;
-import meteordevelopment.meteorclient.settings.StringSetting;
+import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.System;
 import meteordevelopment.meteorclient.systems.Systems;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
-import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
-import meteordevelopment.meteorclient.systems.modules.misc.AutoSleep;
-import meteordevelopment.meteorclient.systems.modules.misc.BetterChat;
-import meteordevelopment.meteorclient.systems.modules.misc.DiscordPresence;
-import meteordevelopment.meteorclient.systems.modules.misc.InventoryTweaks;
-import meteordevelopment.meteorclient.systems.modules.misc.Notebot;
-import meteordevelopment.meteorclient.systems.modules.misc.Notifier;
-import meteordevelopment.meteorclient.systems.modules.misc.SoundBlocker;
-import meteordevelopment.meteorclient.systems.modules.movement.AutoWalk;
-import meteordevelopment.meteorclient.systems.modules.movement.AutoWasp;
-import meteordevelopment.meteorclient.systems.modules.movement.Sprint;
-import meteordevelopment.meteorclient.systems.modules.player.AntiAFK;
-import meteordevelopment.meteorclient.systems.modules.player.AutoEat;
-import meteordevelopment.meteorclient.systems.modules.player.AutoFish;
-import meteordevelopment.meteorclient.systems.modules.player.AutoGap;
-import meteordevelopment.meteorclient.systems.modules.player.AutoMend;
-import meteordevelopment.meteorclient.systems.modules.player.AutoReplenish;
-import meteordevelopment.meteorclient.systems.modules.player.AutoRespawn;
-import meteordevelopment.meteorclient.systems.modules.player.AutoTool;
-import meteordevelopment.meteorclient.systems.modules.player.BreakDelay;
-import meteordevelopment.meteorclient.systems.modules.player.ChestSwap;
-import meteordevelopment.meteorclient.systems.modules.player.EXPThrower;
-import meteordevelopment.meteorclient.systems.modules.player.LiquidInteract;
-import meteordevelopment.meteorclient.systems.modules.player.MiddleClickExtra;
-import meteordevelopment.meteorclient.systems.modules.player.NameProtect;
-import meteordevelopment.meteorclient.systems.modules.player.Portals;
-import meteordevelopment.meteorclient.systems.modules.render.BetterTooltips;
-import meteordevelopment.meteorclient.systems.modules.render.BossStack;
-import meteordevelopment.meteorclient.systems.modules.render.CameraTweaks;
-import meteordevelopment.meteorclient.systems.modules.render.Fullbright;
-import meteordevelopment.meteorclient.systems.modules.render.Grid;
-import meteordevelopment.meteorclient.systems.modules.render.HandView;
-import meteordevelopment.meteorclient.systems.modules.render.ItemHighlight;
-import meteordevelopment.meteorclient.systems.modules.render.ItemPhysics;
-import meteordevelopment.meteorclient.systems.modules.render.LightOverlay;
-import meteordevelopment.meteorclient.systems.modules.render.Nametags;
-import meteordevelopment.meteorclient.systems.modules.render.TimeChanger;
-import meteordevelopment.meteorclient.systems.modules.render.Zoom;
-import meteordevelopment.meteorclient.systems.modules.render.ZoomPlus;
-import meteordevelopment.meteorclient.systems.modules.world.AutoBreed;
-import meteordevelopment.meteorclient.systems.modules.world.AutoBrewer;
-import meteordevelopment.meteorclient.systems.modules.world.AutoMount;
-import meteordevelopment.meteorclient.systems.modules.world.AutoNametag;
-import meteordevelopment.meteorclient.systems.modules.world.AutoShearer;
-import meteordevelopment.meteorclient.systems.modules.world.AutoSign;
-import meteordevelopment.meteorclient.systems.modules.world.AutoSmelter;
-import meteordevelopment.meteorclient.systems.modules.world.DoubleDoorsInteract;
-import meteordevelopment.meteorclient.systems.modules.world.HighwayBuilder;
-import meteordevelopment.meteorclient.systems.modules.world.LiquidFiller;
-import meteordevelopment.meteorclient.systems.modules.world.NoGhostBlocks;
-import meteordevelopment.meteorclient.systems.modules.world.SpawnProofer;
+import meteordevelopment.meteorclient.systems.modules.misc.*;
+import meteordevelopment.meteorclient.systems.modules.movement.*;
+import meteordevelopment.meteorclient.systems.modules.player.*;
+import meteordevelopment.meteorclient.systems.modules.render.*;
+import meteordevelopment.meteorclient.systems.modules.world.*;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
-import java.util.Timer;
-import java.util.TimerTask;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class Config extends System<Config> {
-    private final Timer restoreTimer;
     public final Settings settings = new Settings();
 
-    private final SettingGroup sgVisual  = settings.createGroup("Visual");
+    private final SettingGroup sgVisual = settings.createGroup("Visual");
     private final SettingGroup sgModules = settings.createGroup("Modules");
-    private final SettingGroup sgChat    = settings.createGroup("Chat");
-    private final SettingGroup sgMisc    = settings.createGroup("Misc");
+    private final SettingGroup sgChat = settings.createGroup("Chat");
+    private final SettingGroup sgMisc = settings.createGroup("Misc");
 
-    // ================================
-    // VISUAL SETTINGS
-    // ================================
+    // Visual
 
     public final Setting<Boolean> customFont = sgVisual.add(new BoolSetting.Builder()
         .name("custom-font")
@@ -136,14 +67,14 @@ public class Config extends System<Config> {
 
     public final Setting<Boolean> titleScreenCredits = sgVisual.add(new BoolSetting.Builder()
         .name("title-screen-credits")
-        .description("Show Meteor credits on title screen.")
+        .description("Show Meteor credits on title screen")
         .defaultValue(true)
         .build()
     );
 
     public final Setting<Boolean> titleScreenSplashes = sgVisual.add(new BoolSetting.Builder()
         .name("title-screen-splashes")
-        .description("Show Meteor splash texts on title screen.")
+        .description("Show Meteor splash texts on title screen")
         .defaultValue(true)
         .build()
     );
@@ -152,17 +83,17 @@ public class Config extends System<Config> {
         .name("custom-window-title")
         .description("Show custom text in the window title.")
         .defaultValue(false)
-        .onModuleActivated(setting -> mc.updateWindowTitle())
-        .onChanged(v -> mc.updateWindowTitle())
+        .onModuleActivated(_ -> mc.updateTitle())
+        .onChanged(_ -> mc.updateTitle())
         .build()
     );
 
     public final Setting<String> customWindowTitleText = sgVisual.add(new StringSetting.Builder()
         .name("window-title-text")
-        .description("The text displayed in the window title.")
+        .description("The text it displays in the window title.")
         .visible(customWindowTitle::get)
         .defaultValue("Bliss Client {mc_version} - based on Meteor, adapted by lachameleon")
-        .onChanged(v -> mc.updateWindowTitle())
+        .onChanged(_ -> mc.updateTitle())
         .build()
     );
 
@@ -180,60 +111,75 @@ public class Config extends System<Config> {
         .build()
     );
 
+    public final Setting<ButtonPosition> accountButtonAnchor = sgVisual.add(new EnumSetting.Builder<ButtonPosition>()
+        .name("accounts-button")
+        .description("Controls the position and visibility of the accounts button in the multiplayer screen.")
+        .defaultValue(ButtonPosition.TopRight)
+        .build()
+    );
+
+    public final Setting<Boolean> showAccountStatus = sgVisual.add(new BoolSetting.Builder()
+        .name("account-status")
+        .description("Shows information about the current account in the multiplayer screen.")
+        .defaultValue(true)
+        .build()
+    );
+
+    public final Setting<ButtonPosition> proxiesButtonAnchor = sgVisual.add(new EnumSetting.Builder<ButtonPosition>()
+        .name("proxies-button")
+        .description("Controls the position and visibility of the proxies button in the multiplayer screen.")
+        .defaultValue(ButtonPosition.TopRight)
+        .build()
+    );
+
+    public final Setting<Boolean> showProxiesStatus = sgVisual.add(new BoolSetting.Builder()
+        .name("proxy-status")
+        .description("Shows information about the current proxy in the multiplayer screen.")
+        .defaultValue(true)
+        .build()
+    );
+
     // Modules
 
     public final Setting<List<Module>> hiddenModules = sgModules.add(new ModuleListSetting.Builder()
         .name("hidden-modules")
         .description("Modules hidden from the click GUI.")
-        .defaultValue(new ArrayList<>())   // SAFE — filled later
+        .defaultValue(new ArrayList<>())
         .visible(() -> false)
         .build()
     );
 
-    /**
-     * Call this AFTER modules are initialized.
-     */
     public void initHiddenModules() {
         Modules modules = Modules.get();
-        if (modules == null) return; // Systems not ready yet
+        if (modules == null) return;
 
-        // Allow-list only automation/QoL modules; hide everything else to stay server‑friendly.
         Set<Class<? extends Module>> allowed = Set.of(
-            // Player automation / QoL
             AntiAFK.class, AutoEat.class, AutoFish.class, AutoGap.class, AutoMend.class, AutoReplenish.class,
             AutoRespawn.class, AutoTool.class, BreakDelay.class, ChestSwap.class, EXPThrower.class,
-            LiquidInteract.class, MiddleClickExtra.class, NameProtect.class,
-            Portals.class,
+            LiquidInteract.class, MiddleClickExtra.class, NameProtect.class, Portals.class,
 
-            // Render (cosmetic/info-lite)
             BetterTooltips.class, BossStack.class, CameraTweaks.class, Fullbright.class, Grid.class, HandView.class,
             ItemPhysics.class, ItemHighlight.class, LightOverlay.class, Nametags.class, TimeChanger.class, Zoom.class, ZoomPlus.class,
 
-            // World automation
             AutoBreed.class, AutoBrewer.class, AutoMount.class, AutoNametag.class, AutoShearer.class, AutoSign.class,
-            AutoSmelter.class, DoubleDoorsInteract.class, HighwayBuilder.class, LiquidFiller.class,
-            NoGhostBlocks.class, SpawnProofer.class,
+            AutoSmelter.class, DoubleDoorsInteract.class, HighwayBuilder.class, LiquidFiller.class, NoGhostBlocks.class, SpawnProofer.class,
 
-            // Movement exceptions
             AutoWalk.class, Sprint.class, AutoWasp.class,
 
-            // Misc utilities
             AutoReconnect.class, AutoSleep.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
-            Notebot.class, Notifier.class, SoundBlocker.class
-            ,
+            Notebot.class, Notifier.class, SoundBlocker.class,
 
-            // Stardust modules requested in Bliss
             MusicTweaks.class, BannerData.class, LoreLocator.class, Loadouts.class, AutoDoors.class,
             AdBlocker.class, RoadTrip.class, StashBrander.class, SignatureSign.class, Minesweeper.class,
-            DiscordChatIntegration.class
+            BlissChat.class, DiscordChatIntegration.class
         );
 
-        List<Module> list = new ArrayList<>();
+        List<Module> hidden = new ArrayList<>();
         for (Module module : modules.getAll()) {
-            if (!allowed.contains(module.getClass())) list.add(module);
+            if (!allowed.contains(module.getClass())) hidden.add(module);
         }
 
-        hiddenModules.set(list);
+        hiddenModules.set(hidden);
     }
 
     public final Setting<Integer> moduleSearchCount = sgModules.add(new IntSetting.Builder()
@@ -247,40 +193,36 @@ public class Config extends System<Config> {
 
     public final Setting<Boolean> moduleAliases = sgModules.add(new BoolSetting.Builder()
         .name("search-module-aliases")
-        .description("Use module aliases in the search bar.")
+        .description("Whether or not module aliases will be used in the module search bar.")
         .defaultValue(true)
         .build()
     );
 
-    // ================================
-    // CHAT SETTINGS
-    // ================================
+    // Chat
 
     public final Setting<String> prefix = sgChat.add(new StringSetting.Builder()
         .name("prefix")
-        .description("Command prefix.")
+        .description("Prefix.")
         .defaultValue(".")
         .build()
     );
 
     public final Setting<Boolean> chatFeedback = sgChat.add(new BoolSetting.Builder()
         .name("chat-feedback")
-        .description("Send chat feedback for Meteor actions.")
+        .description("Sends chat feedback when meteor performs certain actions.")
         .defaultValue(true)
         .build()
     );
 
     public final Setting<Boolean> deleteChatFeedback = sgChat.add(new BoolSetting.Builder()
         .name("delete-chat-feedback")
-        .description("Delete previous feedback messages.")
+        .description("Delete previous matching chat feedback to keep chat clear.")
         .visible(chatFeedback::get)
         .defaultValue(true)
         .build()
     );
 
-    // ================================
-    // MISC SETTINGS
-    // ================================
+    // Misc
 
     public final Setting<List<String>> hiddenCommands = sgMisc.add(new StringListSetting.Builder()
         .name("hidden-commands")
@@ -292,126 +234,64 @@ public class Config extends System<Config> {
 
     public final Setting<Integer> rotationHoldTicks = sgMisc.add(new IntSetting.Builder()
         .name("rotation-hold")
-        .description("Amount of ticks to hold rotation without sending packets.")
+        .description("Hold long to hold server side rotation when not sending any packets.")
         .defaultValue(4)
         .build()
     );
 
     public final Setting<Boolean> useTeamColor = sgMisc.add(new BoolSetting.Builder()
         .name("use-team-color")
-        .description("Use player's team color for rendering ESP/tracers.")
+        .description("Uses player's team color for rendering things like esp and tracers.")
         .defaultValue(true)
         .build()
     );
 
     public List<String> dontShowAgainPrompts = new ArrayList<>();
 
-    // ================================
-    // CONSTRUCTOR WITH SAFE DEFAULT CONFIG LOADING
-    // ================================
-
     public Config() {
         super("config");
-
-        Path configPath = Path.of(MeteorClient.FOLDER.getPath(), "config.nbt");
-
-        if (Files.notExists(configPath)) {
-            NbtCompound root = new NbtCompound();
-            root.putString("version", MeteorClient.VERSION.toString());
-            root.put("settings", settings.toTag());
-            root.put("dontShowAgainPrompts", listToTag(new ArrayList<>()));
-
-            NbtCompound settingsCompound = root.getCompoundOrEmpty("settings");
-
-            // General scale
-            NbtCompound generalGroup = settingsCompound.getCompoundOrEmpty("General");
-            generalGroup.putDouble("scale", 1.2158119500350015);
-            settingsCompound.put("General", generalGroup);
-
-            // Colors
-            NbtCompound colorsGroup = settingsCompound.getCompoundOrEmpty("Colors");
-
-            NbtCompound accentColor = new NbtCompound();
-            accentColor.putInt("a", 255);
-            accentColor.putInt("rainbow", 0);
-            accentColor.putInt("r", 255);
-            accentColor.putInt("g", 5);
-            accentColor.putInt("b", 226);
-            colorsGroup.put("accent-color", accentColor);
-
-            NbtCompound checkboxColor = new NbtCompound();
-            checkboxColor.putInt("a", 255);
-            checkboxColor.putInt("rainbow", 0);
-            checkboxColor.putInt("r", 108);
-            checkboxColor.putInt("g", 31);
-            checkboxColor.putInt("b", 106);
-            colorsGroup.put("checkbox-color", checkboxColor);
-
-            settingsCompound.put("Colors", colorsGroup);
-            root.put("settings", settingsCompound);
-
-            try {
-                NbtIo.write(root, configPath);
-                this.fromTag(root);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // If Modules were already initialized earlier, apply hiddenModules now
-        if (Modules.get().getAll().size() > 0) {
-            initHiddenModules();
-            this.save();
-        }
-
-        // Start timer to restore hidden modules every 10 seconds
-        restoreTimer = new Timer(true);
-        restoreTimer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                if (Modules.get() != null && !Modules.get().getAll().isEmpty()) {
-                    initHiddenModules();
-                    save();
-                }
-            }
-        }, 10000, 10000);
     }
 
     public static Config get() {
         return Systems.get(Config.class);
     }
 
-    // ================================
-    // NBT SAVE / LOAD
-    // ================================
-
     @Override
-    public NbtCompound toTag() {
-        NbtCompound tag = new NbtCompound();
+    public CompoundTag toTag() {
+        CompoundTag tag = new CompoundTag();
+
         tag.putString("version", MeteorClient.VERSION.toString());
         tag.put("settings", settings.toTag());
         tag.put("dontShowAgainPrompts", listToTag(dontShowAgainPrompts));
+
         return tag;
     }
 
     @Override
-    public Config fromTag(NbtCompound tag) {
+    public Config fromTag(CompoundTag tag) {
         if (tag.contains("settings")) settings.fromTag(tag.getCompoundOrEmpty("settings"));
-        if (tag.contains("dontShowAgainPrompts"))
-            dontShowAgainPrompts = listFromTag(tag, "dontShowAgainPrompts");
+        if (tag.contains("dontShowAgainPrompts")) dontShowAgainPrompts = listFromTag(tag, "dontShowAgainPrompts");
+
         return this;
     }
 
-    private NbtList listToTag(List<String> list) {
-        NbtList nbt = new NbtList();
-        for (String s : list) nbt.add(NbtString.of(s));
+    private ListTag listToTag(List<String> list) {
+        ListTag nbt = new ListTag();
+        for (String item : list) nbt.add(StringTag.valueOf(item));
         return nbt;
     }
 
-    private List<String> listFromTag(NbtCompound tag, String key) {
+    private List<String> listFromTag(CompoundTag tag, String key) {
         List<String> list = new ArrayList<>();
-        for (NbtElement item : tag.getListOrEmpty(key))
-            list.add(item.asString().orElse(""));
+        for (Tag item : tag.getListOrEmpty(key)) list.add(item.asString().orElse(""));
         return list;
+    }
+
+    public enum ButtonPosition {
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight,
+        Hidden,
     }
 }

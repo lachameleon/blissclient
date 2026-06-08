@@ -1,14 +1,14 @@
 package dev.stardust.mixin.accessor;
 
+import com.mojang.blaze3d.audio.Channel;
 import javax.annotation.Nullable;
-import net.minecraft.client.sound.Source;
+import net.minecraft.client.sounds.ChannelAccess;
 import org.spongepowered.asm.mixin.Mixin;
-import net.minecraft.client.sound.Channel;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(Channel.SourceManager.class)
+@Mixin(ChannelAccess.ChannelHandle.class)
 public interface SourceManagerAccessor {
-    @Accessor("source")
+    @Accessor("channel")
     @Nullable
-    Source getSource();
+    Channel getSource();
 }

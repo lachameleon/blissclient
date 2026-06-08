@@ -9,17 +9,17 @@ import com.google.gson.Gson;
 import oshi.util.tuples.Pair;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import java.lang.reflect.Type;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
 import dev.stardust.util.LogUtil;
 import dev.stardust.util.MsgUtil;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Identifier;
 import dev.stardust.util.StardustUtil;
-import net.minecraft.registry.Registries;
 import com.google.common.reflect.TypeToken;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.screen.PlayerScreenHandler;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.IntSetting;
 import meteordevelopment.meteorclient.settings.BoolSetting;
@@ -118,7 +118,7 @@ public class Loadouts extends Module {
             for (Map.Entry<String, HashMap<Integer, String>> entry : loaded.entrySet()) {
                 HashMap<Integer, Item> itemMap = new HashMap<>();
                 for (Map.Entry<Integer, String> itemId : entry.getValue().entrySet()) {
-                    itemMap.put(itemId.getKey(), Registries.ITEM.get(Identifier.of(itemId.getValue())));
+                    itemMap.put(itemId.getKey(), BuiltInRegistries.ITEM.getValue(Identifier.parse(itemId.getValue())));
                 }
 
                 loadouts.put(entry.getKey(), itemMap);
@@ -140,7 +140,7 @@ public class Loadouts extends Module {
             for (Map.Entry<String, HashMap<Integer, Item>> entry : loadouts.entrySet()) {
                 HashMap<Integer, String> nameMap = new HashMap<>();
                 for (Map.Entry<Integer, Item> itemEntry : entry.getValue().entrySet()) {
-                    nameMap.put(itemEntry.getKey(), Registries.ITEM.getId(itemEntry.getValue()).toString());
+                    nameMap.put(itemEntry.getKey(), BuiltInRegistries.ITEM.getKey(itemEntry.getValue()).toString());
                 }
 
                 itemNameMap.put(entry.getKey(), nameMap);
@@ -157,13 +157,13 @@ public class Loadouts extends Module {
         if (loadouts.isEmpty()) return true;
         if (mc.player == null) return true;
         if (!loadouts.containsKey(loadoutKey)) return true;
-        if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler handler)) return true;
+        if (!(mc.player.containerMenu instanceof InventoryMenu handler)) return true;
 
         HashMap<Integer, Item> loadout = loadouts.get(loadoutKey);
-        for (int n = PlayerScreenHandler.EQUIPMENT_START; n < handler.slots.size(); n++) {
+        for (int n = InventoryMenu.ARMOR_SLOT_START; n < handler.slots.size(); n++) {
             if (!loadout.containsKey(n)) continue;
-            ItemStack stack = handler.getSlot(n).getStack();
-            if (!stack.isOf(loadout.get(n))) return false;
+            ItemStack stack = handler.getSlot(n).getItem();
+            if (!stack.is(loadout.get(n))) return false;
         }
 
         return true;
@@ -171,12 +171,12 @@ public class Loadouts extends Module {
 
     public void saveLoadout(String name) {
         if (mc.player == null) return;
-        if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler handler)) return;
+        if (!(mc.player.containerMenu instanceof InventoryMenu handler)) return;
 
         HashMap<Integer, Item> loadout = new HashMap<>();
-        for (int n = PlayerScreenHandler.EQUIPMENT_START; n < handler.slots.size(); n++) {
-            ItemStack stack = handler.getSlot(n).getStack();
-            if (!stack.isEmpty() && !stack.isOf(Items.AIR)) {
+        for (int n = InventoryMenu.ARMOR_SLOT_START; n < handler.slots.size(); n++) {
+            ItemStack stack = handler.getSlot(n).getItem();
+            if (!stack.isEmpty() && !stack.is(Items.AIR)) {
                 loadout.put(n, stack.getItem());
             }
         }
@@ -190,7 +190,7 @@ public class Loadouts extends Module {
 
     public void loadLoadout(String name) {
         if (mc.player == null) return;
-        if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler handler)) return;
+        if (!(mc.player.containerMenu instanceof InventoryMenu handler)) return;
 
         if (loadouts.isEmpty() || !loadouts.containsKey(name) || loadouts.get(name).isEmpty()) {
             MsgUtil.sendModuleMsg("§oNo loadout \"§3§o" + name + "§7§o\" saved§c§o..!", this.name);
@@ -202,40 +202,40 @@ public class Loadouts extends Module {
         ArrayList<Integer> sorted = new ArrayList<>();
         HashMap<Integer, Item> loadout = loadouts.get(name);
         HashMap<Integer, ItemStack> changedSlots = new HashMap<>();
-        for (int to = PlayerScreenHandler.EQUIPMENT_START; to < handler.slots.size(); to++) {
+        for (int to = InventoryMenu.ARMOR_SLOT_START; to < handler.slots.size(); to++) {
             Item assigned = loadout.get(to);
             if (assigned == null) continue;
 
-            ItemStack current = handler.getSlot(to).getStack();
+            ItemStack current = handler.getSlot(to).getItem();
             if (debug.get()) {
                 LogUtil.info(
-                    "Assigned: " + assigned.getName().getString()
-                    + " | Current: " + current.getName().getString(), this.name
+                    "Assigned: " + assigned.getDefaultInstance().getHoverName().getString()
+                    + " | Current: " + current.getHoverName().getString(), this.name
                 );
             }
 
-            if (current.isOf(assigned)) {
+            if (current.is(assigned)) {
                 if (debug.get()) LogUtil.info("Slot already sorted..!", this.name);
                 sorted.add(to);
                 continue;
             }
 
-            for (int from = PlayerScreenHandler.EQUIPMENT_START; from < handler.slots.size(); from++) {
+            for (int from = InventoryMenu.ARMOR_SLOT_START; from < handler.slots.size(); from++) {
                 if (to == from || sorted.contains(from)) continue;
                 ItemStack occupiedBy;
                 if (changedSlots.containsKey(from)) {
                     occupiedBy = changedSlots.get(from);
                 } else {
-                    occupiedBy = handler.getSlot(from).getStack();
+                    occupiedBy = handler.getSlot(from).getItem();
                 }
                 if (debug.get()) {
                     LogUtil.info(
-                        "Looking for: " + assigned.getName().getString()
-                        + " | found: " + occupiedBy.getName().getString(), this.name
+                        "Looking for: " + assigned.getDefaultInstance().getHoverName().getString()
+                        + " | found: " + occupiedBy.getHoverName().getString(), this.name
                     );
                 }
-                if (occupiedBy.isOf(assigned)) {
-                    if (loadout.get(from) != null && occupiedBy.isOf(loadout.get(from))) {
+                if (occupiedBy.is(assigned)) {
+                    if (loadout.get(from) != null && occupiedBy.is(loadout.get(from))) {
                         sorted.add(from);
                         continue;
                     }
@@ -253,7 +253,7 @@ public class Loadouts extends Module {
 
                     if (debug.get()) {
                         LogUtil.info(
-                            "Moving stack: " + occupiedBy.getName().getString()
+                            "Moving stack: " + occupiedBy.getHoverName().getString()
                             + " from slot " + from + " to slot " + to + "..!", this.name
                         );
                     }
@@ -267,7 +267,7 @@ public class Loadouts extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null) return;
-        if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler)) return;
+        if (!(mc.player.containerMenu instanceof InventoryMenu)) return;
 
         ++ticks;
         if (ticks >= tickRateSetting.get()) {

@@ -309,7 +309,7 @@ public class Minesweeper extends Module {
 
     @Override
     public void onDeactivate() {
-        if (mc.currentScreen instanceof MinesweeperScreen) {
+        if (mc.screen instanceof MinesweeperScreen) {
             try {
                 mc.setScreen(null);
             } catch (Exception err) {

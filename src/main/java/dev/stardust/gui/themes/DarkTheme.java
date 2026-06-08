@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class DarkTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final DarkTheme INSTANCE = new DarkTheme();
 
+    public DarkTheme() {
+        super("Dark");
+    }
+
     @Override
     public String getName() {
         return "Dark";

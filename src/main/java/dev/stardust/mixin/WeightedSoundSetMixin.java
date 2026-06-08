@@ -1,41 +1,41 @@
 package dev.stardust.mixin;
 
 import java.util.List;
-import net.minecraft.util.Identifier;
 import dev.stardust.modules.MusicTweaks;
-import net.minecraft.client.sound.Sound;
-import net.minecraft.sound.SoundCategory;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import io.netty.util.internal.ThreadLocalRandom;
 import org.spongepowered.asm.mixin.injection.At;
-import net.minecraft.client.sound.SoundContainer;
-import net.minecraft.client.sound.WeightedSoundSet;
 import org.spongepowered.asm.mixin.injection.Inject;
 import meteordevelopment.meteorclient.systems.modules.Modules;
-import net.minecraft.util.math.floatprovider.ConstantFloatProvider;
+import net.minecraft.client.resources.sounds.Sound;
+import net.minecraft.client.sounds.WeighedSoundEvents;
+import net.minecraft.client.sounds.Weighted;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.valueproviders.ConstantFloat;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
  **/
-@Mixin(WeightedSoundSet.class)
-public abstract class WeightedSoundSetMixin implements SoundContainer<Sound> {
+@Mixin(WeighedSoundEvents.class)
+public abstract class WeightedSoundSetMixin implements Weighted<Sound> {
     @Shadow
     @Final
-    private List<SoundContainer<Sound>> sounds;
+    private List<Weighted<Sound>> list;
 
     // See MusicTweaks.java
-    @Inject(method = "getSound(Lnet/minecraft/util/math/random/Random;)Lnet/minecraft/client/sound/Sound;", at = @At("HEAD"), cancellable = true)
-    private void mixinGetSound(net.minecraft.util.math.random.Random random, CallbackInfoReturnable<Sound> cir) {
+    @Inject(method = "getSound(Lnet/minecraft/util/RandomSource;)Lnet/minecraft/client/resources/sounds/Sound;", at = @At("HEAD"), cancellable = true)
+    private void mixinGetSound(net.minecraft.util.RandomSource random, CallbackInfoReturnable<Sound> cir) {
         Modules modules = Modules.get();
         if (modules == null) return;
         MusicTweaks tweaks = modules.get(MusicTweaks.class);
         if (tweaks == null || !tweaks.isActive()) return;
 
         boolean overwrite = false;
-        for (SoundContainer<Sound> sound : this.sounds) {
+        for (Weighted<Sound> sound : this.list) {
             String id = sound.getSound(random).toString();
 
             if (id.contains("minecraft:music/")) {
@@ -54,14 +54,14 @@ public abstract class WeightedSoundSetMixin implements SoundContainer<Sound> {
         } else {
             adjustedPitch = 1.0f + tweaks.getPitchAdjustment();
         }
-        float adjustedVolume = tweaks.getClient().options.getSoundVolume(SoundCategory.MUSIC) + tweaks.getVolumeAdjustment();
+        float adjustedVolume = tweaks.getClient().options.getFinalSoundSourceVolume(SoundSource.MUSIC) + tweaks.getVolumeAdjustment();
 
         cir.setReturnValue(
             new Sound(
-                Identifier.of(soundIDs.get(ThreadLocalRandom.current().nextInt(soundIDs.size()))),
-                ConstantFloatProvider.create(adjustedVolume),
-                ConstantFloatProvider.create(adjustedPitch),
-                this.getWeight(), Sound.RegistrationType.SOUND_EVENT,
+                Identifier.parse(soundIDs.get(ThreadLocalRandom.current().nextInt(soundIDs.size()))),
+                ConstantFloat.of(adjustedVolume),
+                ConstantFloat.of(adjustedPitch),
+                this.getWeight(), Sound.Type.SOUND_EVENT,
                 true, true, 16
             )
         );

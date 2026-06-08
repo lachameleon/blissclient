@@ -9,10 +9,9 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.misc.TweenHandler;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import java.util.List;
 
 public class ZoomPlus extends Module {
@@ -370,14 +369,14 @@ public class ZoomPlus extends Module {
         deactivated = false;
 
         if (!isSubscribed) {
-            if (hideHud.get()) mc.options.hudHidden = true;
+            if (hideHud.get()) mc.options.hideGui = true;
             MeteorClient.EVENT_BUS.subscribe(this);
             MeteorClient.EVENT_BUS.subscribe(tweenHandler);
             isSubscribed = true;
         }
 
         if (zoomInPlaySound.get()) {
-            mc.world.playSoundFromEntity(mc.player, mc.player, zoomInSound.get().getFirst(), net.minecraft.sound.SoundCategory.MASTER, zoomInSoundVolume.get().floatValue(), zoomInSoundPitch.get().floatValue());
+            mc.level.playSound(mc.player, mc.player, zoomInSound.get().getFirst(), net.minecraft.sounds.SoundSource.MASTER, zoomInSoundVolume.get().floatValue(), zoomInSoundPitch.get().floatValue());
         }
 
         tweenHandler.play(instantZoomIn.get(), currentZoomFactor, zoomFactor.get(), zoomInEasingDuration.get(), zoomInEasingStyle.get(), zoomInEasingDirection.get());
@@ -396,7 +395,7 @@ public class ZoomPlus extends Module {
         deactivated = true;
 
         if (zoomOutPlaySound.get()) {
-            mc.world.playSoundFromEntity(mc.player, mc.player, zoomOutSound.get().getFirst(), SoundCategory.MASTER, zoomOutSoundVolume.get().floatValue(), zoomOutSoundPitch.get().floatValue());
+            mc.level.playSound(mc.player, mc.player, zoomOutSound.get().getFirst(), SoundSource.MASTER, zoomOutSoundVolume.get().floatValue(), zoomOutSoundPitch.get().floatValue());
         }
 
         tweenHandler.play(instantZoomOut.get(), currentZoomFactor, 1, zoomOutEasingDuration.get(), zoomOutEasingStyle.get(), zoomOutEasingDirection.get());
@@ -415,7 +414,7 @@ public class ZoomPlus extends Module {
             SoundEvent sound = scrollIn ? scrollInSound.get().getFirst() : scrollOutSound.get().getFirst();
             float soundPitch = scrollIn ? scrollInSoundPitch.get().floatValue() : scrollOutSoundPitch.get().floatValue();
             float soundVolume = scrollIn ? scrollInSoundVolume.get().floatValue() : scrollOutSoundVolume.get().floatValue();
-            mc.world.playSoundFromEntity(mc.player, mc.player, sound, SoundCategory.MASTER, soundVolume, soundPitch);
+            mc.level.playSound(mc.player, mc.player, sound, SoundSource.MASTER, soundVolume, soundPitch);
         }
 
         boolean instantScroll = scrollIn ? instantScrollIn.get() : instantScrollOut.get();

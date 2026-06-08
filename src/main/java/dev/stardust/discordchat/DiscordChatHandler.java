@@ -1,14 +1,13 @@
 package dev.stardust.discordchat;
 
 import dev.stardust.Stardust;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.client.Minecraft;
 
 public class DiscordChatHandler {
     private final AtomicBoolean running = new AtomicBoolean(true);
@@ -54,8 +53,8 @@ public class DiscordChatHandler {
     public void handleDiscordMessage(DiscordWebSocketServer.ChatMessage message) {
         if (!running.get()) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.player.networkHandler == null) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.player.connection == null) return;
 
         messageProcessor.execute(() -> {
             try {
@@ -115,8 +114,8 @@ public class DiscordChatHandler {
     }
 
     private void executeMessageImmediately(DiscordWebSocketServer.ChatMessage message) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.player.networkHandler == null) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.player.connection == null) return;
 
         if (!isSendingFromDiscord.compareAndSet(false, true)) {
             Stardust.LOG.debug("Concurrent message execution");
@@ -137,9 +136,9 @@ public class DiscordChatHandler {
             client.execute(() -> {
                 try {
                     if (message.content.startsWith("/")) {
-                        client.player.networkHandler.sendChatCommand(message.content.substring(1));
+                        client.player.connection.sendCommand(message.content.substring(1));
                     } else {
-                        client.player.networkHandler.sendChatMessage(message.content);
+                        client.player.connection.sendChat(message.content);
                     }
                 } catch (Exception e) {
                     Stardust.LOG.error("Error sending to chat: {}", e.getMessage());
@@ -195,7 +194,7 @@ public class DiscordChatHandler {
         });
     }
 
-    private String getPlayerName(MinecraftClient client) {
+    private String getPlayerName(Minecraft client) {
         if (client == null || client.player == null) return null;
 
         try {
@@ -211,8 +210,8 @@ public class DiscordChatHandler {
         }
 
         try {
-            if (client.getSession() != null) {
-                String name = client.getSession().getUsername();
+            if (client.getUser() != null) {
+                String name = client.getUser().getName();
                 if (name != null && !name.isEmpty() && !name.equals("Player")) return name;
             }
         } catch (Exception ignored) {

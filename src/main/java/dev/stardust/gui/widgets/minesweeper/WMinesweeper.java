@@ -1,16 +1,17 @@
 package dev.stardust.gui.widgets.minesweeper;
 
 import java.util.*;
-import net.minecraft.sound.SoundEvents;
 import dev.stardust.modules.Minesweeper;
 import java.util.concurrent.ThreadLocalRandom;
-import net.minecraft.client.gui.Click;
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
-import net.minecraft.client.sound.PositionedSoundInstance;
+
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvents;
 import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 
 /**
@@ -189,15 +190,15 @@ public class WMinesweeper extends WWidget {
                 module.clearSave();
                 if (module.gameSounds.get()) {
                     mc.getSoundManager().play(
-                        PositionedSoundInstance.master(
-                            SoundEvents.ENTITY_VILLAGER_NO,
+                        SimpleSoundInstance.forUI(
+                            SoundEvents.VILLAGER_NO,
                             ThreadLocalRandom.current().nextFloat(0.77f, 1.1337f),
                             module.soundVolume.get().floatValue()
                         )
                     );
                     mc.getSoundManager().play(
-                        PositionedSoundInstance.master(
-                            SoundEvents.ENTITY_GENERIC_EXPLODE.value(),
+                        SimpleSoundInstance.forUI(
+                            SoundEvents.GENERIC_EXPLODE.value(),
                             ThreadLocalRandom.current().nextFloat(0.77f, 1.1337f),
                             module.soundVolume.get().floatValue()
                         )
@@ -219,15 +220,15 @@ public class WMinesweeper extends WWidget {
                 module.clearSave();
                 if (module.gameSounds.get()) {
                     mc.getSoundManager().play(
-                        PositionedSoundInstance.master(
-                            SoundEvents.ENTITY_VILLAGER_YES,
+                        SimpleSoundInstance.forUI(
+                            SoundEvents.VILLAGER_YES,
                             ThreadLocalRandom.current().nextFloat(0.77f, 1.1337f),
                             module.soundVolume.get().floatValue()
                         )
                     );
                     mc.getSoundManager().play(
-                        PositionedSoundInstance.master(
-                            SoundEvents.ENTITY_PLAYER_LEVELUP,
+                        SimpleSoundInstance.forUI(
+                            SoundEvents.PLAYER_LEVELUP,
                             ThreadLocalRandom.current().nextFloat(0.77f, 1.1337f),
                             module.soundVolume.get().floatValue()
                         )
@@ -240,8 +241,8 @@ public class WMinesweeper extends WWidget {
             gameEnd = System.currentTimeMillis();
         } else if (module.gameSounds.get()) {
             mc.getSoundManager().play(
-                PositionedSoundInstance.master(
-                    SoundEvents.BLOCK_AMETHYST_BLOCK_STEP,
+                SimpleSoundInstance.forUI(
+                    SoundEvents.AMETHYST_BLOCK_STEP,
                     ThreadLocalRandom.current().nextFloat(0.666f, 1.420f),
                     module.soundVolume.get().floatValue()
                 )
@@ -288,8 +289,8 @@ public class WMinesweeper extends WWidget {
             state[r][c] = (byte) 0;
             if (module.gameSounds.get()) {
                 mc.getSoundManager().play(
-                    PositionedSoundInstance.master(
-                        SoundEvents.ENTITY_ITEM_FRAME_REMOVE_ITEM,
+                    SimpleSoundInstance.forUI(
+                        SoundEvents.ITEM_FRAME_REMOVE_ITEM,
                         ThreadLocalRandom.current().nextFloat(0.666f, 1.333f), module.soundVolume.get().floatValue()
                     )
                 );
@@ -298,8 +299,8 @@ public class WMinesweeper extends WWidget {
             state[r][c] = (byte) 2;
             if (module.gameSounds.get()) {
                 mc.getSoundManager().play(
-                    PositionedSoundInstance.master(
-                        SoundEvents.ENTITY_ITEM_FRAME_ADD_ITEM,
+                    SimpleSoundInstance.forUI(
+                        SoundEvents.ITEM_FRAME_ADD_ITEM,
                         ThreadLocalRandom.current().nextFloat(0.666f, 1.333f), module.soundVolume.get().floatValue()
                     )
                 );
@@ -330,7 +331,7 @@ public class WMinesweeper extends WWidget {
     }
 
     @Override
-    public boolean onMouseClicked(Click click, boolean doubled) {
+    public boolean onMouseClicked(MouseButtonEvent click, boolean doubled) {
         double mouseX = click.x();
         double mouseY = click.y();
         double localX = mouseX - x;
@@ -424,7 +425,7 @@ public class WMinesweeper extends WWidget {
     }
 
     @Override
-    public boolean onMouseReleased(Click click) {
+    public boolean onMouseReleased(MouseButtonEvent click) {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();

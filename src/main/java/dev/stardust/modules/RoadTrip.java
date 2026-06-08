@@ -4,29 +4,29 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import meteordevelopment.meteorclient.systems.modules.Categories;
-import net.minecraft.item.Item;
-import net.minecraft.text.Text;
-import net.minecraft.item.Items;
 import dev.stardust.util.MsgUtil;
 import javax.annotation.Nullable;
-import net.minecraft.item.ItemStack;
 import java.util.concurrent.TimeUnit;
 import dev.stardust.util.StardustUtil;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.entity.EntityType;
-import net.minecraft.util.math.BlockPos;
 import dev.stardust.config.StardustConfig;
-import net.minecraft.entity.EquipmentSlot;
 import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.EventPriority;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import meteordevelopment.meteorclient.settings.*;
-import net.minecraft.component.DataComponentTypes;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import dev.stardust.mixin.accessor.DisconnectS2CPacketAccessor;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
-import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
 import meteordevelopment.meteorclient.events.entity.EntityAddedEvent;
 
 /**
@@ -192,7 +192,7 @@ public class RoadTrip extends Module {
         new ItemListSetting.Builder()
             .name("valid-food")
             .description("Which food to look for when deciding whether to disconnect you.")
-            .filter(stack -> stack.getComponents().contains(DataComponentTypes.FOOD))
+            .filter(stack -> stack.components().has(DataComponents.FOOD))
             .defaultValue(List.of(Items.GOLDEN_CARROT, Items.COOKED_BEEF, Items.ENCHANTED_GOLDEN_APPLE))
             .build()
     );
@@ -246,7 +246,7 @@ public class RoadTrip extends Module {
     private long logOutTimer = -69L;
     private long timerTimestamp = 0L;
     private @Nullable BlockPos lastPos = null;
-    private @Nullable Text disconnectReason = null;
+    private @Nullable Component disconnectReason = null;
     private int bufferSize = averageSpeedMinutes.get() * 1200;
     private final ArrayDeque<Double> bpsValues = new ArrayDeque<>();
 
@@ -288,16 +288,16 @@ public class RoadTrip extends Module {
 
         boolean reset = false;
         if (elytraNotify.get()) {
-            if (mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem() != Items.ELYTRA) return;
+            if (mc.player.getItemBySlot(EquipmentSlot.CHEST).getItem() != Items.ELYTRA) return;
 
-            ItemStack equippedElytra = mc.player.getEquippedStack(EquipmentSlot.CHEST);
+            ItemStack equippedElytra = mc.player.getItemBySlot(EquipmentSlot.CHEST);
 
             int maxDurability = equippedElytra.getMaxDamage();
-            int currentDurability = maxDurability - equippedElytra.getDamage();
+            int currentDurability = maxDurability - equippedElytra.getDamageValue();
             double percentDurability = Math.floor((currentDurability / (double) maxDurability) * 100);
 
             if (percentDurability <= 5) {
-                mc.player.playSound(SoundEvents.ENTITY_ITEM_BREAK.value(), pingVolume.get().floatValue(), 1f);
+                mc.player.playSound(SoundEvents.ITEM_BREAK.value(), pingVolume.get().floatValue(), 1f);
                 MsgUtil.updateModuleMsg("Elytra durability: §c" + percentDurability + "§7%", this.name, "roadTripElytraWarn".hashCode());
                 reset = true;
             }
@@ -306,7 +306,7 @@ public class RoadTrip extends Module {
         if (lagNotify.get() && ticksNotMoved >= 80) {
             reset = true;
             ticksNotMoved = 0;
-            mc.player.playSound(SoundEvents.ENTITY_PHANTOM_SWOOP, pingVolume.get().floatValue(), 1f);
+            mc.player.playSound(SoundEvents.PHANTOM_SWOOP, pingVolume.get().floatValue(), 1f);
         }
 
         if (reset) ticksSinceWarned = 0;
@@ -315,12 +315,12 @@ public class RoadTrip extends Module {
     private boolean hasEnoughElytras() {
         if (mc.player == null) return false;
         ArrayList<Integer> goodSlotsLeft = new ArrayList<>();
-        for (int n = 0; n < mc.player.getInventory().getMainStacks().size(); n++) {
-            ItemStack stack = mc.player.getInventory().getStack(n);
+        for (int n = 0; n < mc.player.getInventory().getNonEquipmentItems().size(); n++) {
+            ItemStack stack = mc.player.getInventory().getItem(n);
 
             if (stack.getItem() == Items.ELYTRA) {
                 int max = stack.getMaxDamage();
-                int curr = max - stack.getDamage();
+                int curr = max - stack.getDamageValue();
                 double percent = Math.floor((curr / (double) max) * 100);
 
                 if (percent > 5) {
@@ -334,8 +334,8 @@ public class RoadTrip extends Module {
     private boolean hasEnoughRockets() {
         if (mc.player == null) return false;
         int totalRocketsLeft = 0;
-        for (int n = 0; n < mc.player.getInventory().getMainStacks().size(); n++) {
-            ItemStack stack = mc.player.getInventory().getStack(n);
+        for (int n = 0; n < mc.player.getInventory().getNonEquipmentItems().size(); n++) {
+            ItemStack stack = mc.player.getInventory().getItem(n);
             if (stack.getItem() == Items.FIREWORK_ROCKET) {
                 totalRocketsLeft += stack.getCount();
             }
@@ -346,8 +346,8 @@ public class RoadTrip extends Module {
     private boolean hasEnoughFood() {
         if (mc.player == null) return false;
         int totalFoodLeft = 0;
-        for (int n = 0; n < mc.player.getInventory().getMainStacks().size(); n++) {
-            ItemStack stack = mc.player.getInventory().getStack(n);
+        for (int n = 0; n < mc.player.getInventory().getNonEquipmentItems().size(); n++) {
+            ItemStack stack = mc.player.getInventory().getItem(n);
             if (chosenFood.get().contains(stack.getItem())) {
                 totalFoodLeft += stack.getCount();
             }
@@ -355,15 +355,15 @@ public class RoadTrip extends Module {
         return totalFoodLeft > foodStock.get();
     }
 
-    private void doForceKick(Text disconnectReason) {
+    private void doForceKick(Component disconnectReason) {
         this.disconnectReason = disconnectReason;
         StardustUtil.illegalDisconnect(true, StardustConfig.illegalDisconnectMethodSetting.get());
     }
 
-    private void disconnect(Text reason) {
-        if (mc.getNetworkHandler() == null) return;
+    private void disconnect(Component reason) {
+        if (mc.getConnection() == null) return;
         StardustUtil.disableAutoReconnect();
-        mc.getNetworkHandler().onDisconnect(new DisconnectS2CPacket(reason));
+        mc.getConnection().handleDisconnect(new ClientboundDisconnectPacket(reason));
         switch (autoLogToggle.get()) {
             case Module -> toggle();
             case Settings -> disableAutoLogSettings();
@@ -382,8 +382,8 @@ public class RoadTrip extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (StardustUtil.isIn2b2tQueue()) return;
-        if (mc.getNetworkHandler() == null) return;
-        if (mc.player == null || mc.world == null) return;
+        if (mc.getConnection() == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         ++timer;
         ++ticksSinceWarned;
@@ -392,7 +392,7 @@ public class RoadTrip extends Module {
             long now = System.currentTimeMillis();
             if (now - timerTimestamp >= timeoutAutoLogTimer.get() * 1000) {
                 timerTimestamp = now;
-                Text reason = Text.literal("§8[§5RoadTrip§8] §7Disconnected you because your §3" + timeoutAutoLogTimer.get() + "§7-second timer has elapsed§a..!");
+                Component reason = Component.literal("§8[§5RoadTrip§8] §7Disconnected you because your §3" + timeoutAutoLogTimer.get() + "§7-second timer has elapsed§a..!");
                 if (forceKick.get()) {
                     doForceKick(reason);
                 } else {
@@ -402,7 +402,7 @@ public class RoadTrip extends Module {
         }
 
         if (yLevelAutoLog.get() && mc.player.getY() < yLevelThreshold.get()) {
-            Text reason = Text.literal("§8[§4RoadTrip§8] §fDisconnected you because your Y level descended below §c"+ yLevelThreshold.get()+"§8!");
+            Component reason = Component.literal("§8[§4RoadTrip§8] §fDisconnected you because your Y level descended below §c"+ yLevelThreshold.get()+"§8!");
             if (forceKick.get()) {
                 doForceKick(reason);
             } else {
@@ -411,7 +411,7 @@ public class RoadTrip extends Module {
         }
 
         if (lowElytraAutoLog.get() && !hasEnoughElytras()) {
-            Text reason = Text.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on healthy elytras§c!");
+            Component reason = Component.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on healthy elytras§c!");
             if (forceKick.get()) {
                 doForceKick(reason);
             } else {
@@ -420,7 +420,7 @@ public class RoadTrip extends Module {
         }
 
         if (lowRocketsAutoLog.get() && !hasEnoughRockets()) {
-            Text reason = Text.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on firework rockets§c!");
+            Component reason = Component.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on firework rockets§c!");
             if (forceKick.get()) {
                 doForceKick(reason);
             } else {
@@ -429,7 +429,7 @@ public class RoadTrip extends Module {
         }
 
         if (lowFoodAutoLog.get() && !hasEnoughFood()) {
-            Text reason = Text.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on food§c!");
+            Component reason = Component.literal("§8[§2RoadTrip§8] §fDisconnected you because you are running low on food§c!");
             if (forceKick.get()) {
                 doForceKick(reason);
             } else {
@@ -437,22 +437,22 @@ public class RoadTrip extends Module {
             }
         }
 
-        BlockPos newPos = mc.player.getBlockPos();
+        BlockPos newPos = mc.player.blockPosition();
 
         if (lastPos == null) lastPos = newPos;
-        else if (lastPos.getManhattanDistance(newPos) <= 1) {
+        else if (lastPos.distManhattan(newPos) <= 1) {
             ++ticksNotMoved;
             lastPos = newPos;
         }
 
         BlockPos destination = new BlockPos(targetX.get(), mc.player.getBlockY(), targetZ.get());
 
-        int totalBlocksLeft = newPos.getManhattanDistance(destination);
-        double blocksPerSecond = Utils.getPlayerSpeed().horizontalLength();
+        int totalBlocksLeft = newPos.distManhattan(destination);
+        double blocksPerSecond = Utils.getPlayerSpeed().horizontalDistance();
 
         if (etaAutoLog.get() && totalBlocksLeft <= etaAutoLogThreshold.get()) {
-            if (mc.getNetworkHandler().getPlayerList().size() > 1) {
-                Text reason = Text.literal("§8[§2RoadTrip§8] §fDisconnected you because you have reached your destination§2! §5:§3]");
+            if (mc.getConnection().getOnlinePlayers().size() > 1) {
+                Component reason = Component.literal("§8[§2RoadTrip§8] §fDisconnected you because you have reached your destination§2! §5:§3]");
                 if (forceKick.get()) {
                     doForceKick(reason);
                 } else {
@@ -529,14 +529,14 @@ public class RoadTrip extends Module {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onEntityAddHighPriority(EntityAddedEvent event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (!antiTrapAutoLog.get() || event.entity.getType() != EntityType.TNT_MINECART) return;
-        doForceKick(Text.literal("§8[§aRoadTrip§8] §c§oDisconnected you to avoid a trap§8§o! §8§o(§c§oTNT minecarts §7§owere rendered§c§o!§8§o)"));
+        doForceKick(Component.literal("§8[§aRoadTrip§8] §c§oDisconnected you to avoid a trap§8§o! §8§o(§c§oTNT minecarts §7§owere rendered§c§o!§8§o)"));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (!(event.packet instanceof DisconnectS2CPacket packet) || disconnectReason == null) return;
+        if (!(event.packet instanceof ClientboundDisconnectPacket packet) || disconnectReason == null) return;
         ((DisconnectS2CPacketAccessor)(Object) packet).setReason(disconnectReason);
         switch (autoLogToggle.get()) {
             case Module -> toggle();

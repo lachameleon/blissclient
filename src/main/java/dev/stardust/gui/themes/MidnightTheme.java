@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class MidnightTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final MidnightTheme INSTANCE = new MidnightTheme();
 
+    public MidnightTheme() {
+        super("Midnight");
+    }
+
     @Override
     public String getName() {
         return "Midnight";

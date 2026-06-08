@@ -13,12 +13,11 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import java.net.BindException;
 import java.net.URI;
 
@@ -117,8 +116,8 @@ public class DiscordChatIntegration extends Module {
     private void onTick(TickEvent.Post event) {
         if (chatHandler == null) return;
 
-        if (mc.world != null) {
-            chatHandler.onTick(mc.world.getTime());
+        if (mc.level != null) {
+            chatHandler.onTick(mc.level.getGameTime());
         }
 
         maybeShowTutorial();
@@ -154,10 +153,10 @@ public class DiscordChatIntegration extends Module {
         long elapsed = System.currentTimeMillis() - enabledAtMs;
         if (elapsed < NO_CLIENT_WARNING_DELAY_MS) return;
 
-        sendLine(Text.literal("No Discord plugin detected yet (0 clients).")
-            .formatted(Formatting.RED));
-        sendLine(Text.literal("Install the BetterDiscord or Vencord plugin and make sure the port matches.")
-            .formatted(Formatting.GRAY));
+        sendLine(Component.literal("No Discord plugin detected yet (0 clients).")
+            .withStyle(ChatFormatting.RED));
+        sendLine(Component.literal("Install the BetterDiscord or Vencord plugin and make sure the port matches.")
+            .withStyle(ChatFormatting.GRAY));
         sendTutorial();
         tutorialShown = true;
     }
@@ -167,82 +166,82 @@ public class DiscordChatIntegration extends Module {
 
         DiscordWebSocketServer server = DiscordWebSocketServer.getInstance();
         if (!isActive()) {
-            sendLine(Text.literal("Discord chat module is disabled.").formatted(Formatting.RED));
-            sendLine(Text.literal("Enable the module to start the WebSocket server.").formatted(Formatting.GRAY));
+            sendLine(Component.literal("Discord chat module is disabled.").withStyle(ChatFormatting.RED));
+            sendLine(Component.literal("Enable the module to start the WebSocket server.").withStyle(ChatFormatting.GRAY));
             return;
         }
 
         if (server == null) {
-            sendLine(Text.literal("WebSocket server is not initialized.").formatted(Formatting.RED));
-            sendLine(Text.literal("Try /discordchat reconnect or re-enable the module.").formatted(Formatting.GRAY));
+            sendLine(Component.literal("WebSocket server is not initialized.").withStyle(ChatFormatting.RED));
+            sendLine(Component.literal("Try /discordchat reconnect or re-enable the module.").withStyle(ChatFormatting.GRAY));
             return;
         }
 
         if (server.isRunning()) {
-            MutableText status = Text.literal("Status: ").formatted(Formatting.GRAY)
-                .append(Text.literal("Running").formatted(Formatting.GREEN))
-                .append(Text.literal(" | Port: ").formatted(Formatting.GRAY))
-                .append(Text.literal(String.valueOf(port.get())).formatted(Formatting.WHITE))
-                .append(Text.literal(" | Clients: ").formatted(Formatting.GRAY))
-                .append(Text.literal(String.valueOf(server.getConnectionCount())).formatted(Formatting.WHITE));
+            MutableComponent status = Component.literal("Status: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal("Running").withStyle(ChatFormatting.GREEN))
+                .append(Component.literal(" | Port: ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(String.valueOf(port.get())).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" | Clients: ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(String.valueOf(server.getConnectionCount())).withStyle(ChatFormatting.WHITE));
             sendLine(status);
             if (server.getConnectionCount() == 0) {
-                sendLine(Text.literal("No Discord clients connected. Install the plugin and check the port.")
-                    .formatted(Formatting.YELLOW));
-                sendLine(Text.literal("Use /discordchat tutorial for setup steps.")
-                    .formatted(Formatting.GRAY));
+                sendLine(Component.literal("No Discord clients connected. Install the plugin and check the port.")
+                    .withStyle(ChatFormatting.YELLOW));
+                sendLine(Component.literal("Use /discordchat tutorial for setup steps.")
+                    .withStyle(ChatFormatting.GRAY));
             }
         } else {
-            sendLine(Text.literal("WebSocket server is stopped.").formatted(Formatting.RED));
-            sendLine(Text.literal("Port may be in use or server failed to start.").formatted(Formatting.GRAY));
-            sendLine(Text.literal("Use /discordchat port <number> or /discordchat reconnect.").formatted(Formatting.GRAY));
+            sendLine(Component.literal("WebSocket server is stopped.").withStyle(ChatFormatting.RED));
+            sendLine(Component.literal("Port may be in use or server failed to start.").withStyle(ChatFormatting.GRAY));
+            sendLine(Component.literal("Use /discordchat port <number> or /discordchat reconnect.").withStyle(ChatFormatting.GRAY));
         }
     }
 
     public void sendTutorial() {
         if (mc.player == null) return;
 
-        sendLine(Text.literal("Discord Chat Integration setup:").formatted(Formatting.GOLD));
-        sendLine(Text.literal("1) Download plugin files from ").formatted(Formatting.GRAY)
+        sendLine(Component.literal("Discord Chat Integration setup:").withStyle(ChatFormatting.GOLD));
+        sendLine(Component.literal("1) Download plugin files from ").withStyle(ChatFormatting.GRAY)
             .append(link("Releases", RELEASES_URL)));
 
-        sendLine(Text.literal("2) BetterDiscord install:").formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Put MinecraftChat.plugin.js in your BetterDiscord plugins folder and enable it.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Guide: ").formatted(Formatting.GRAY)
+        sendLine(Component.literal("2) BetterDiscord install:").withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Put MinecraftChat.plugin.js in your BetterDiscord plugins folder and enable it.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Guide: ").withStyle(ChatFormatting.GRAY)
             .append(link("BetterDiscord plugin guide", BETTERDISCORD_GUIDE_URL)));
 
-        sendLine(Text.literal("3) Vencord install:").formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Requires Node.js, git, and pnpm.").formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Put minecraftChat.tsx in Vencord/src/userplugins.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Run: pnpm build, then pnpm inject. Enable the plugin in Discord.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Guide: ").formatted(Formatting.GRAY)
+        sendLine(Component.literal("3) Vencord install:").withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Requires Node.js, git, and pnpm.").withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Put minecraftChat.tsx in Vencord/src/userplugins.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Run: pnpm build, then pnpm inject. Enable the plugin in Discord.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Guide: ").withStyle(ChatFormatting.GRAY)
             .append(link("Vencord custom plugin guide", VENCORD_GUIDE_URL)));
 
-        sendLine(Text.literal("4) In Discord: click the chat bar gear icon → Add Client.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("   - Set Name, Port (default 25580), Channel ID, Enabled.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("5) Channel ID: enable Developer Mode, right-click channel → Copy ID.")
-            .formatted(Formatting.GRAY));
-        sendLine(Text.literal("6) Enable this module in Minecraft, then use /discordchat status.")
-            .formatted(Formatting.GRAY));
+        sendLine(Component.literal("4) In Discord: click the chat bar gear icon → Add Client.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("   - Set Name, Port (default 25580), Channel ID, Enabled.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("5) Channel ID: enable Developer Mode, right-click channel → Copy ID.")
+            .withStyle(ChatFormatting.GRAY));
+        sendLine(Component.literal("6) Enable this module in Minecraft, then use /discordchat status.")
+            .withStyle(ChatFormatting.GRAY));
 
-        sendLine(Text.literal("Note: Forward-to-Discord may be considered self-botting. Use a private server.")
-            .formatted(Formatting.YELLOW));
+        sendLine(Component.literal("Note: Forward-to-Discord may be considered self-botting. Use a private server.")
+            .withStyle(ChatFormatting.YELLOW));
     }
 
-    private MutableText link(String label, String url) {
-        MutableText text = Text.literal(label).formatted(Formatting.AQUA, Formatting.UNDERLINE);
+    private MutableComponent link(String label, String url) {
+        MutableComponent text = Component.literal(label).withStyle(ChatFormatting.AQUA, ChatFormatting.UNDERLINE);
         return text.setStyle(text.getStyle()
             .withClickEvent(new ClickEvent.OpenUrl(URI.create(url)))
-            .withHoverEvent(new HoverEvent.ShowText(Text.literal(url).formatted(Formatting.GRAY))));
+            .withHoverEvent(new HoverEvent.ShowText(Component.literal(url).withStyle(ChatFormatting.GRAY))));
     }
 
-    private void sendLine(Text text) {
-        ChatUtils.sendMsg(0, "DiscordChat", Formatting.AQUA, text);
+    private void sendLine(Component text) {
+        ChatUtils.sendMsg(0, "DiscordChat", ChatFormatting.AQUA, text);
     }
 
     public int getPort() {
@@ -289,8 +288,8 @@ public class DiscordChatIntegration extends Module {
                 if (!server.isRunning()) throw new RuntimeException("Server failed to start");
 
                 if (token == startToken && mc.player != null) {
-                    sendLine(Text.literal("WebSocket server started on port " + desiredPort + ".")
-                        .formatted(Formatting.GREEN));
+                    sendLine(Component.literal("WebSocket server started on port " + desiredPort + ".")
+                        .withStyle(ChatFormatting.GREEN));
                 }
             } catch (Exception e) {
                 if (token != startToken) return;
@@ -320,17 +319,17 @@ public class DiscordChatIntegration extends Module {
     private void showPortError(int port) {
         if (mc.player == null) return;
 
-        sendLine(Text.literal("Port " + port + " is already in use.").formatted(Formatting.RED));
-        sendLine(Text.literal("Change it in module settings or use /discordchat port <number>.")
-            .formatted(Formatting.GRAY));
+        sendLine(Component.literal("Port " + port + " is already in use.").withStyle(ChatFormatting.RED));
+        sendLine(Component.literal("Change it in module settings or use /discordchat port <number>.")
+            .withStyle(ChatFormatting.GRAY));
     }
 
     private void showGenericError(String message) {
         if (mc.player == null) return;
 
-        sendLine(Text.literal("Failed to start WebSocket server.").formatted(Formatting.RED));
+        sendLine(Component.literal("Failed to start WebSocket server.").withStyle(ChatFormatting.RED));
         if (message != null && !message.isBlank()) {
-            sendLine(Text.literal("Error: " + message).formatted(Formatting.GRAY));
+            sendLine(Component.literal("Error: " + message).withStyle(ChatFormatting.GRAY));
         }
     }
 }

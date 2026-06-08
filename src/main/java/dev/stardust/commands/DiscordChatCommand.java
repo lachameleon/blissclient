@@ -10,18 +10,18 @@ import dev.stardust.modules.DiscordChatIntegration;
 import meteordevelopment.meteorclient.commands.Command;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.multiplayer.ClientSuggestionProvider;
+import net.minecraft.network.chat.Component;
 
-import static net.minecraft.command.CommandSource.suggestMatching;
+import static net.minecraft.commands.SharedSuggestionProvider.suggest;
 
 public class DiscordChatCommand extends Command {
-    private static final SuggestionProvider<CommandSource> AUTOMATION_SUGGESTIONS = (context, builder) -> {
+    private static final SuggestionProvider<ClientSuggestionProvider> AUTOMATION_SUGGESTIONS = (context, builder) -> {
         DiscordWebSocketServer server = DiscordWebSocketServer.getInstance();
         if (server != null && server.isRunning()) {
             server.requestAutomationsList();
-            return suggestMatching(server.getCachedAutomationNames(), builder);
+            return suggest(server.getCachedAutomationNames(), builder);
         }
         return builder.buildFuture();
     };
@@ -31,7 +31,7 @@ public class DiscordChatCommand extends Command {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<ClientSuggestionProvider> builder) {
         builder.executes(context -> {
             showStatus();
             return SINGLE_SUCCESS;
@@ -132,7 +132,7 @@ public class DiscordChatCommand extends Command {
             return;
         }
 
-        sendLine(Text.literal("Current WebSocket port: " + module.getPort()));
+        sendLine(Component.literal("Current WebSocket port: " + module.getPort()));
     }
 
     private void setPort(int port) {
@@ -144,12 +144,12 @@ public class DiscordChatCommand extends Command {
 
         int current = module.getPort();
         if (current == port) {
-            sendLine(Text.literal("Port is already set to " + port + "."));
+            sendLine(Component.literal("Port is already set to " + port + "."));
             return;
         }
 
         module.setPort(port);
-        sendLine(Text.literal("Port changed from " + current + " to " + port + "."));
+        sendLine(Component.literal("Port changed from " + current + " to " + port + "."));
     }
 
     private void reconnect() {
@@ -161,11 +161,11 @@ public class DiscordChatCommand extends Command {
 
         if (!module.isActive()) {
             module.enable();
-            sendLine(Text.literal("Module enabled. Starting server on port " + module.getPort() + "."));
+            sendLine(Component.literal("Module enabled. Starting server on port " + module.getPort() + "."));
             return;
         }
 
-        sendLine(Text.literal("Restarting WebSocket server..."));
+        sendLine(Component.literal("Restarting WebSocket server..."));
         module.restartServer();
     }
 
@@ -177,12 +177,12 @@ public class DiscordChatCommand extends Command {
         }
 
         if (!module.isActive()) {
-            sendLine(Text.literal("Module is already disabled."));
+            sendLine(Component.literal("Module is already disabled."));
             return;
         }
 
         module.disable();
-        sendLine(Text.literal("Discord chat bridge stopped. Enable the module to reconnect."));
+        sendLine(Component.literal("Discord chat bridge stopped. Enable the module to reconnect."));
     }
 
     private void showTickTest() {
@@ -193,16 +193,16 @@ public class DiscordChatCommand extends Command {
         }
 
         if (!module.isActive()) {
-            sendLine(Text.literal("Module is disabled. Enable it to test tick sync."));
+            sendLine(Component.literal("Module is disabled. Enable it to test tick sync."));
             return;
         }
 
-        if (mc == null || mc.world == null) {
-            sendLine(Text.literal("Not in a world. Join a server to test tick sync."));
+        if (mc == null || mc.level == null) {
+            sendLine(Component.literal("Not in a world. Join a server to test tick sync."));
             return;
         }
 
-        long serverTick = mc.world.getTime();
+        long serverTick = mc.level.getGameTime();
         long clientTimeMs = System.currentTimeMillis();
 
         String playerName = "Unknown";
@@ -238,22 +238,22 @@ public class DiscordChatCommand extends Command {
             message.append(String.format("§7Waited: §f%d§r ms", execTime - receiveTime));
         }
 
-        sendLine(Text.literal(message.toString()));
+        sendLine(Component.literal(message.toString()));
     }
 
     private void runAutomation(String automationName) {
         DiscordWebSocketServer server = DiscordWebSocketServer.getInstance();
         if (server == null || !server.isRunning()) {
-            sendLine(Text.literal("WebSocket server is not running. Use /discordchat reconnect."));
+            sendLine(Component.literal("WebSocket server is not running. Use /discordchat reconnect."));
             return;
         }
 
         if (server.getConnectionCount() == 0) {
-            sendLine(Text.literal("No Discord clients connected."));
+            sendLine(Component.literal("No Discord clients connected."));
             return;
         }
 
-        sendLine(Text.literal("Running automation: " + automationName + "..."));
+        sendLine(Component.literal("Running automation: " + automationName + "..."));
         server.runAutomation(automationName);
 
         new Thread(() -> {
@@ -261,7 +261,7 @@ public class DiscordChatCommand extends Command {
                 Thread.sleep(500);
                 String result = server.getAndClearAutomationResult();
                 if (result != null && mc != null && mc.player != null) {
-                    mc.execute(() -> sendLine(Text.literal(result)));
+                    mc.execute(() -> sendLine(Component.literal(result)));
                 }
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
@@ -272,16 +272,16 @@ public class DiscordChatCommand extends Command {
     private void stopAutomations() {
         DiscordWebSocketServer server = DiscordWebSocketServer.getInstance();
         if (server == null || !server.isRunning()) {
-            sendLine(Text.literal("WebSocket server is not running."));
+            sendLine(Component.literal("WebSocket server is not running."));
             return;
         }
 
         if (server.getConnectionCount() == 0) {
-            sendLine(Text.literal("No Discord clients connected."));
+            sendLine(Component.literal("No Discord clients connected."));
             return;
         }
 
-        sendLine(Text.literal("Stopping automations..."));
+        sendLine(Component.literal("Stopping automations..."));
         server.stopAutomations();
 
         new Thread(() -> {
@@ -289,7 +289,7 @@ public class DiscordChatCommand extends Command {
                 Thread.sleep(300);
                 String result = server.getAndClearAutomationResult();
                 if (result != null && mc != null && mc.player != null) {
-                    mc.execute(() -> sendLine(Text.literal(result)));
+                    mc.execute(() -> sendLine(Component.literal(result)));
                 }
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
@@ -300,12 +300,12 @@ public class DiscordChatCommand extends Command {
     private void listAutomations() {
         DiscordWebSocketServer server = DiscordWebSocketServer.getInstance();
         if (server == null || !server.isRunning()) {
-            sendLine(Text.literal("WebSocket server is not running."));
+            sendLine(Component.literal("WebSocket server is not running."));
             return;
         }
 
         if (server.getConnectionCount() == 0) {
-            sendLine(Text.literal("No Discord clients connected."));
+            sendLine(Component.literal("No Discord clients connected."));
             return;
         }
 
@@ -318,7 +318,7 @@ public class DiscordChatCommand extends Command {
                 if (mc != null && mc.player != null) {
                     mc.execute(() -> {
                         if (names.isEmpty()) {
-                            sendLine(Text.literal("No automations configured in Discord plugin."));
+                            sendLine(Component.literal("No automations configured in Discord plugin."));
                         } else {
                             StringBuilder sb = new StringBuilder();
                             sb.append("§6=== Available Automations ===§r\n");
@@ -326,7 +326,7 @@ public class DiscordChatCommand extends Command {
                                 sb.append("§7• §f").append(name).append("§r\n");
                             }
                             sb.append("§7Use §f/discordchat run <name>§7 to run an automation.");
-                            sendLine(Text.literal(sb.toString()));
+                            sendLine(Component.literal(sb.toString()));
                         }
                     });
                 }
@@ -336,7 +336,7 @@ public class DiscordChatCommand extends Command {
         }, "Automations-List-Wait").start();
     }
 
-    private void sendLine(Text text) {
-        ChatUtils.sendMsg(0, "DiscordChat", Formatting.AQUA, text);
+    private void sendLine(Component text) {
+        ChatUtils.sendMsg(0, "DiscordChat", ChatFormatting.AQUA, text);
     }
 }

@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class StardustTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final StardustTheme INSTANCE = new StardustTheme();
 
+    public StardustTheme() {
+        super("Stardust");
+    }
+
     @Override
     public String getName() {
         return "Stardust";

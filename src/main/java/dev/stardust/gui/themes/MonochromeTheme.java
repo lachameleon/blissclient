@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class MonochromeTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final MonochromeTheme INSTANCE = new MonochromeTheme();
 
+    public MonochromeTheme() {
+        super("Monochrome");
+    }
+
     @Override
     public String getName() {
         return "Monochrome";

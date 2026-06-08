@@ -1,7 +1,7 @@
 {
   "required": true,
   "package": "dev.stardust.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
     "AnvilScreenMixin",
     "DoorBlockMixin",
@@ -18,8 +18,6 @@
     "accessor.MusicTrackerAccessor",
     "accessor.SourceManagerAccessor",
     "meteor.BetterTooltipsMixin",
-    "meteor.GuiThemeMixin",
-    "meteor.MeteorGuiThemeMixin",
     "meteor.NotifierMixin",
     "meteor.accessor.SettingAccessor"
   ],

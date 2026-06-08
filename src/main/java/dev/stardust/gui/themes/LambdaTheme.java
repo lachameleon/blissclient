@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class LambdaTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final LambdaTheme INSTANCE = new LambdaTheme();
 
+    public LambdaTheme() {
+        super("Lambda");
+    }
+
     @Override
     public String getName() {
         return "Lambda";

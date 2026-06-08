@@ -3,20 +3,28 @@ package dev.stardust.modules;
 import java.util.Arrays;
 import java.util.Optional;
 import meteordevelopment.meteorclient.systems.modules.Categories;
-import net.minecraft.screen.*;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.component.ComponentMap;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.component.type.NbtComponent;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.inventory.*;
+import net.minecraft.world.entity.animal.fish.TropicalFish;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.DispenserMenu;
+import net.minecraft.world.inventory.HopperMenu;
+import net.minecraft.world.inventory.HorseInventoryMenu;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.ShulkerBoxMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.item.enchantment.Enchantments;
 import meteordevelopment.meteorclient.settings.*;
-import net.minecraft.component.DataComponentTypes;
 import meteordevelopment.meteorclient.utils.Utils;
-import net.minecraft.entity.passive.TropicalFishEntity;
-import net.minecraft.component.type.FireworksComponent;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.registry.Registries;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 
@@ -147,25 +155,25 @@ public class LoreLocator extends Module {
         int count = 0;
         if (!stack.isEmpty()) {
             count = stack.getItem() == Items.ENCHANTED_BOOK
-                ? stack.get(DataComponentTypes.STORED_ENCHANTMENTS).getEnchantments().size()
-                : stack.getEnchantments().getSize();
+                ? stack.get(DataComponents.STORED_ENCHANTMENTS).keySet().size()
+                : stack.getEnchantments().size();
         }
         return count;
     }
 
     private boolean isColoredShulker(Item item) {
-        String id = Registries.ITEM.getId(item).getPath();
+        String id = BuiltInRegistries.ITEM.getKey(item).getPath();
         return id.endsWith("shulker_box") && item != Items.SHULKER_BOX;
     }
 
-    private boolean shouldIgnoreCurrentScreenHandler(ClientPlayerEntity player) {
-        if (mc.currentScreen == null) return true;
-        if (player.currentScreenHandler == null) return true;
-        ScreenHandler handler = player.currentScreenHandler;
-        if (handler instanceof PlayerScreenHandler) return !ownInventory.get();
-        return !(handler instanceof AbstractFurnaceScreenHandler || handler instanceof GenericContainerScreenHandler
-            || handler instanceof Generic3x3ContainerScreenHandler || handler instanceof ShulkerBoxScreenHandler
-            || handler instanceof HopperScreenHandler || handler instanceof HorseScreenHandler);
+    private boolean shouldIgnoreCurrentScreenHandler(LocalPlayer player) {
+        if (mc.screen == null) return true;
+        if (player.containerMenu == null) return true;
+        AbstractContainerMenu handler = player.containerMenu;
+        if (handler instanceof InventoryMenu) return !ownInventory.get();
+        return !(handler instanceof AbstractFurnaceMenu || handler instanceof ChestMenu
+            || handler instanceof DispenserMenu || handler instanceof ShulkerBoxMenu
+            || handler instanceof HopperMenu || handler instanceof HorseInventoryMenu);
     }
 
     // See DrawContextMixin.java
@@ -182,7 +190,7 @@ public class LoreLocator extends Module {
         }
 
         if (!metadataSearch.get().trim().isEmpty()) {
-            ComponentMap metadata = stack.getComponents();
+            DataComponentMap metadata = stack.getComponents();
             String query = metadataSearch.get().toLowerCase();
 
             if (splitQueries.get() && query.contains(",")) {
@@ -191,8 +199,8 @@ public class LoreLocator extends Module {
                 if (metadata != null && Arrays.stream(queries).anyMatch(q -> metadata.toString().toLowerCase().contains(q.trim())
                     || metadata.toString().toLowerCase().contains(q.trim().replace(" ", "_")))) {
                     return true;
-                } else if (Arrays.stream(queries).anyMatch(q -> stack.getName().getString().toLowerCase().contains(q.trim())
-                    || stack.getItem().getDefaultStack().getName().getString().toLowerCase().contains(q.trim()))) {
+                } else if (Arrays.stream(queries).anyMatch(q -> stack.getHoverName().getString().toLowerCase().contains(q.trim())
+                    || stack.getItem().getDefaultInstance().getHoverName().getString().toLowerCase().contains(q.trim()))) {
                     return true;
                 }
             } else {
@@ -201,30 +209,30 @@ public class LoreLocator extends Module {
                     else if (metadata.toString().toLowerCase().contains(query.trim().replace(" ", "_"))) return true;
                 }
 
-                if (stack.getName().getString().toLowerCase().contains(query.trim())) return true;
-                else if (stack.getItem().getDefaultStack().getName().getString().toLowerCase().contains(query.trim())) return true;
+                if (stack.getHoverName().getString().toLowerCase().contains(query.trim())) return true;
+                else if (stack.getItem().getDefaultInstance().getHoverName().getString().toLowerCase().contains(query.trim())) return true;
             }
         }
 
-        if (!renamedShulks.get() && stack.contains(DataComponentTypes.CUSTOM_NAME)) {
+        if (!renamedShulks.get() && stack.has(DataComponents.CUSTOM_NAME)) {
             if (stack.getItem() == Items.SHULKER_BOX || isColoredShulker(stack.getItem())) return false;
         }
 
-        if (lagRockets.get() && stack.contains(DataComponentTypes.FIREWORKS)) {
-            FireworksComponent firework = stack.get(DataComponentTypes.FIREWORKS);
+        if (lagRockets.get() && stack.has(DataComponents.FIREWORKS)) {
+            Fireworks firework = stack.get(DataComponents.FIREWORKS);
             if (firework.explosions().size() == 7) return true;
         }
 
-        if (illegalFish.get() && stack.isOf(Items.TROPICAL_FISH_BUCKET)) {
-            NbtComponent nbtComponent = stack.getOrDefault(DataComponentTypes.BUCKET_ENTITY_DATA, NbtComponent.DEFAULT);
+        if (illegalFish.get() && stack.is(Items.TROPICAL_FISH_BUCKET)) {
+            CustomData nbtComponent = stack.getOrDefault(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY);
             if (!nbtComponent.isEmpty()) {
-                if (nbtComponent.copyNbt().contains("BucketVariantTag")) {
-                    Optional<Integer> bucketVariantTag = nbtComponent.copyNbt().getInt("BucketVariantTag");
+                if (nbtComponent.copyTag().contains("BucketVariantTag")) {
+                    Optional<Integer> bucketVariantTag = nbtComponent.copyTag().getInt("BucketVariantTag");
                     if (bucketVariantTag.isPresent()) {
-                        TropicalFishEntity.Variant variant = new TropicalFishEntity.Variant(bucketVariantTag.get());
+                        TropicalFish.Variant variant = new TropicalFish.Variant(bucketVariantTag.get());
                         String string = "color.minecraft." + variant.baseColor();
                         String string2 = "color.minecraft." + variant.patternColor();
-                        int i = TropicalFishEntity.COMMON_VARIANTS.indexOf(variant);
+                        int i = TropicalFish.COMMON_VARIANTS.indexOf(variant);
                         if (i == -1) {
                             if (string.contains("black") || string2.contains("black")) {
                                 return true;
@@ -237,13 +245,13 @@ public class LoreLocator extends Module {
 
         if (writtenBooks.get() && stack.getItem() == Items.WRITTEN_BOOK) return true;
         if (petrifiedSlabs.get() && stack.getItem() == Items.PETRIFIED_OAK_SLAB) return true;
-        if (renamedItems.get() && stack.contains(DataComponentTypes.CUSTOM_NAME)) return true;
+        if (renamedItems.get() && stack.has(DataComponents.CUSTOM_NAME)) return true;
 
-        if (negativeDurability.get() && stack.isDamageable()) {
-            if (stack.getOrDefault(DataComponentTypes.DAMAGE, stack.getDamage()) >= stack.getMaxDamage()) return true;
+        if (negativeDurability.get() && stack.isDamageableItem()) {
+            if (stack.getOrDefault(DataComponents.DAMAGE, stack.getDamageValue()) >= stack.getMaxDamage()) return true;
         }
 
-        if (illegalEnchants.get() && (stack.getItem() == Items.ENCHANTED_BOOK || stack.hasEnchantments())) {
+        if (illegalEnchants.get() && (stack.getItem() == Items.ENCHANTED_BOOK || stack.isEnchanted())) {
             int enchantmentsCount = enchantmentsCount(stack);
             if (stack.getItem() == Items.SHEARS && Utils.hasEnchantment(stack, Enchantments.SILK_TOUCH)) {
                 return enchantmentsCount == 1 || !onlySilkyShears.get();

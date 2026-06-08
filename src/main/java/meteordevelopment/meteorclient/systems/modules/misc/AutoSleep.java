@@ -7,13 +7,11 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BedBlock;
-import net.minecraft.text.TranslatableTextContent;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.phys.BlockHitResult;
 import java.util.Objects;
 
 public class AutoSleep extends Module {
@@ -93,8 +91,8 @@ public class AutoSleep extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.world == null) return;
-        if (dimensionRestrict.get() && !mc.world.getDimension().hasSkyLight()) return;
+        if (mc.level == null) return;
+        if (dimensionRestrict.get() && !mc.level.dimensionType().hasSkyLight()) return;
 
         if (mc.player.isSleeping()) {
             if (useMaxSleepTime.get()) {
@@ -111,11 +109,11 @@ public class AutoSleep extends Module {
             sleepDelayTimer = sleepDelay.get();
 
             if (atNight.get() && atThunderstorm.get()) {
-                if (isDay() && !mc.world.isThundering()) return;
+                if (isDay() && !mc.level.isThundering()) return;
             } else if (atNight.get()) {
                 if (isDay()) return;
             } else if (atThunderstorm.get()) {
-                if (!mc.world.isThundering()) return;
+                if (!mc.level.isThundering()) return;
             }
 
             if (sleepInNearestBed(bedSearchRadius.get())) sleepDelayTimer = 0;
@@ -124,16 +122,16 @@ public class AutoSleep extends Module {
 
     // Yeah, hacky, but looks like `world.isDay()` and `world.isNight()` doesn't work on the client
     private boolean isDay() {
-        if (mc.world == null) return true;
-        float time = mc.world.getTimeOfDay() % 24000;
-        return mc.world.isRaining() ? (!(time > 12010) || !(time < 23991)) : (!(time > 12542) || !(time < 23459));
+        if (mc.level == null) return true;
+        float time = mc.level.getGameTime() % 24000;
+        return mc.level.isRaining() ? (!(time > 12010) || !(time < 23991)) : (!(time > 12542) || !(time < 23459));
     }
 
     private boolean sleepInNearestBed(int radius) {
-        for (BlockPos blockPos : BlockPos.iterate(mc.player.getBlockPos().add(-radius, -radius, -radius), mc.player.getBlockPos().add(radius, radius, radius))) {
-            if (mc.world.getBlockState(blockPos).getBlock() instanceof BedBlock) {
+        for (BlockPos blockPos : BlockPos.betweenClosed(mc.player.blockPosition().offset(-radius, -radius, -radius), mc.player.blockPosition().offset(radius, radius, radius))) {
+            if (mc.level.getBlockState(blockPos).getBlock() instanceof BedBlock) {
                 sleepTimer = 0;
-                BlockUtils.interact(new BlockHitResult(blockPos.toCenterPos(), Direction.UP, blockPos, false), Hand.MAIN_HAND, false);
+                BlockUtils.interact(new BlockHitResult(blockPos.getCenter(), Direction.UP, blockPos, false), InteractionHand.MAIN_HAND, false);
                 return true;
             }
         }

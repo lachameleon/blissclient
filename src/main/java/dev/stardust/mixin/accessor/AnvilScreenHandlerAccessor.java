@@ -1,12 +1,12 @@
 package dev.stardust.mixin.accessor;
 
-import net.minecraft.screen.Property;
+import net.minecraft.world.inventory.AnvilMenu;
+import net.minecraft.world.inventory.DataSlot;
 import org.spongepowered.asm.mixin.Mixin;
-import net.minecraft.screen.AnvilScreenHandler;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(AnvilScreenHandler.class)
+@Mixin(AnvilMenu.class)
 public interface AnvilScreenHandlerAccessor {
     @Accessor
-    Property getLevelCost();
+    DataSlot getCost();
 }

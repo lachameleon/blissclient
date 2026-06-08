@@ -5,6 +5,8 @@
 
 package meteordevelopment.meteorclient.gui.themes.meteor;
 
+import com.mojang.blaze3d.platform.MacosUtil;
+import dev.stardust.gui.RecolorGuiTheme;
 import meteordevelopment.meteorclient.gui.DefaultSettingsWidgetFactory;
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.WidgetScreen;
@@ -30,7 +32,8 @@ import meteordevelopment.meteorclient.systems.accounts.Account;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
-import net.minecraft.client.util.MacWindowUtil;
+
+import java.util.function.Function;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
@@ -54,8 +57,8 @@ public class MeteorGuiTheme extends GuiTheme {
         .min(0.75)
         .sliderRange(0.75, 4)
         .onSliderRelease()
-        .onChanged(aDouble -> {
-            if (mc.currentScreen instanceof WidgetScreen) ((WidgetScreen) mc.currentScreen).invalidate();
+        .onChanged(_ -> {
+            if (mc.screen instanceof WidgetScreen widgetScreen) widgetScreen.invalidate();
         })
         .build()
     );
@@ -63,14 +66,14 @@ public class MeteorGuiTheme extends GuiTheme {
     public final Setting<AlignmentX> moduleAlignment = sgGeneral.add(new EnumSetting.Builder<AlignmentX>()
         .name("module-alignment")
         .description("How module titles are aligned.")
-        .defaultValue(AlignmentX.Left)
+        .defaultValue(AlignmentX.Center)
         .build()
     );
 
     public final Setting<Boolean> categoryIcons = sgGeneral.add(new BoolSetting.Builder()
         .name("category-icons")
         .description("Adds item icons to module categories.")
-        .defaultValue(false)
+        .defaultValue(recolor(RecolorGuiTheme::getCategoryIcons, true))
         .build()
     );
 
@@ -79,107 +82,125 @@ public class MeteorGuiTheme extends GuiTheme {
         .description("Hide HUD when in GUI.")
         .defaultValue(false)
         .onChanged(v -> {
-            if (mc.currentScreen instanceof WidgetScreen) mc.options.hudHidden = v;
+            if (mc.screen instanceof WidgetScreen) mc.options.hideGui = v;
         })
         .build()
     );
 
     // Colors
 
-    public final Setting<SettingColor> accentColor = color("accent", "Main color of the GUI.", new SettingColor(255, 115, 190));
-    public final Setting<SettingColor> checkboxColor = color("checkbox", "Color of checkbox.", new SettingColor(255, 145, 210));
-    public final Setting<SettingColor> plusColor = color("plus", "Color of plus button.", new SettingColor(120, 240, 180));
-    public final Setting<SettingColor> minusColor = color("minus", "Color of minus button.", new SettingColor(255, 120, 150));
-    public final Setting<SettingColor> favoriteColor = color("favorite", "Color of checked favorite button.", new SettingColor(255, 188, 235));
+    public final Setting<SettingColor> accentColor = color("accent", "Main color of the GUI.", recolor(RecolorGuiTheme::getAccentColor, new SettingColor(255, 79, 174)));
+    public final Setting<SettingColor> checkboxColor = color("checkbox", "Color of checkbox.", recolor(RecolorGuiTheme::getCheckboxColor, new SettingColor(255, 120, 196)));
+    public final Setting<SettingColor> plusColor = color("plus", "Color of plus button.", recolor(RecolorGuiTheme::getPlusColor, new SettingColor(255, 170, 218)));
+    public final Setting<SettingColor> minusColor = color("minus", "Color of minus button.", recolor(RecolorGuiTheme::getMinusColor, new SettingColor(255, 71, 126)));
+    public final Setting<SettingColor> favoriteColor = color("favorite", "Color of checked favorite button.", recolor(RecolorGuiTheme::getFavoriteColor, new SettingColor(255, 211, 236)));
 
     // Text
 
-    public final Setting<SettingColor> textColor = color(sgTextColors, "text", "Color of text.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> textSecondaryColor = color(sgTextColors, "text-secondary-text", "Color of secondary text.", new SettingColor(150, 150, 150));
-    public final Setting<SettingColor> textHighlightColor = color(sgTextColors, "text-highlight", "Color of text highlighting.", new SettingColor(45, 125, 245, 100));
-    public final Setting<SettingColor> titleTextColor = color(sgTextColors, "title-text", "Color of title text.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> loggedInColor = color(sgTextColors, "logged-in-text", "Color of logged in account name.", new SettingColor(45, 225, 45));
-    public final Setting<SettingColor> placeholderColor = color(sgTextColors, "placeholder", "Color of placeholder text.", new SettingColor(255, 255, 255, 20));
+    public final Setting<SettingColor> textColor = color(sgTextColors, "text", "Color of text.", recolor(RecolorGuiTheme::getTextColor, new SettingColor(255, 255, 255)));
+    public final Setting<SettingColor> textSecondaryColor = color(sgTextColors, "text-secondary-text", "Color of secondary text.", recolor(RecolorGuiTheme::getTextSecondaryColor, new SettingColor(255, 176, 221)));
+    public final Setting<SettingColor> textHighlightColor = color(sgTextColors, "text-highlight", "Color of text highlighting.", recolor(RecolorGuiTheme::getTextHighlightColor, new SettingColor(255, 79, 174, 115)));
+    public final Setting<SettingColor> titleTextColor = color(sgTextColors, "title-text", "Color of title text.", recolor(RecolorGuiTheme::getTitleTextColor, new SettingColor(255, 255, 255)));
+    public final Setting<SettingColor> loggedInColor = color(sgTextColors, "logged-in-text", "Color of logged in account name.", recolor(RecolorGuiTheme::getLoggedInColor, new SettingColor(45, 225, 45)));
+    public final Setting<SettingColor> placeholderColor = color(sgTextColors, "placeholder", "Color of placeholder text.", recolor(RecolorGuiTheme::getPlaceholderColor, new SettingColor(255, 255, 255, 20)));
 
     // Background
 
-    public final ThreeStateColorSetting backgroundColor = new ThreeStateColorSetting(
-            sgBackgroundColors,
-            "background",
-            new SettingColor(20, 20, 20, 200),
-            new SettingColor(30, 30, 30, 200),
-            new SettingColor(40, 40, 40, 200)
+    public final ThreeStateColorSetting backgroundColor = threeStateColor(
+        sgBackgroundColors,
+        "background",
+        RecolorGuiTheme::getBackgroundColor,
+        new SettingColor(23, 8, 18, 220),
+        new SettingColor(42, 13, 33, 220),
+        new SettingColor(68, 18, 52, 220)
     );
 
-    public final Setting<SettingColor> moduleBackground = color(sgBackgroundColors, "module-background", "Color of module background when active.", new SettingColor(50, 50, 50));
+    public final Setting<SettingColor> moduleBackground = color(sgBackgroundColors, "module-background", "Color of module background when active.", recolor(RecolorGuiTheme::getModuleBackground, new SettingColor(255, 79, 174, 55)));
 
     // Outline
 
-    public final ThreeStateColorSetting outlineColor = new ThreeStateColorSetting(
-            sgOutline,
-            "outline",
-            new SettingColor(70, 40, 70, 180),
-            new SettingColor(90, 50, 90, 200),
-            new SettingColor(110, 60, 110, 220)
+    public final ThreeStateColorSetting outlineColor = threeStateColor(
+        sgOutline,
+        "outline",
+        RecolorGuiTheme::getOutlineColor,
+        new SettingColor(70, 18, 52),
+        new SettingColor(109, 27, 78),
+        new SettingColor(155, 38, 112)
     );
 
     // Separator
 
-    public final Setting<SettingColor> separatorText = color(sgSeparator, "separator-text", "Color of separator text", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> separatorCenter = color(sgSeparator, "separator-center", "Center color of separators.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> separatorEdges = color(sgSeparator, "separator-edges", "Color of separator edges.", new SettingColor(225, 225, 225, 150));
+    public final Setting<SettingColor> separatorText = color(sgSeparator, "separator-text", "Color of separator text", recolor(RecolorGuiTheme::getSeparatorText, new SettingColor(255, 255, 255)));
+    public final Setting<SettingColor> separatorCenter = color(sgSeparator, "separator-center", "Center color of separators.", recolor(RecolorGuiTheme::getSeparatorCenter, new SettingColor(255, 120, 196)));
+    public final Setting<SettingColor> separatorEdges = color(sgSeparator, "separator-edges", "Color of separator edges.", recolor(RecolorGuiTheme::getSeparatorEdges, new SettingColor(255, 79, 174, 120)));
 
     // Scrollbar
 
-    public final ThreeStateColorSetting scrollbarColor = new ThreeStateColorSetting(
-            sgScrollbar,
-            "Scrollbar",
-            new SettingColor(60, 30, 60, 200),
-            new SettingColor(80, 40, 80, 200),
-            new SettingColor(100, 55, 100, 220)
+    public final ThreeStateColorSetting scrollbarColor = threeStateColor(
+        sgScrollbar,
+        "Scrollbar",
+        RecolorGuiTheme::getScrollbarColor,
+        new SettingColor(78, 20, 57, 200),
+        new SettingColor(125, 32, 91, 220),
+        new SettingColor(255, 79, 174, 235)
     );
 
     // Slider
 
-    public final ThreeStateColorSetting sliderHandle = new ThreeStateColorSetting(
-            sgSlider,
-            "slider-handle",
-            new SettingColor(255, 140, 210),
-            new SettingColor(255, 155, 220),
-            new SettingColor(255, 175, 230)
+    public final ThreeStateColorSetting sliderHandle = threeStateColor(
+        sgSlider,
+        "slider-handle",
+        RecolorGuiTheme::getSliderHandle,
+        new SettingColor(255, 79, 174),
+        new SettingColor(255, 120, 196),
+        new SettingColor(255, 170, 218)
     );
 
-    public final Setting<SettingColor> sliderLeft = color(sgSlider, "slider-left", "Color of slider left part.", new SettingColor(255, 140, 200));
-    public final Setting<SettingColor> sliderRight = color(sgSlider, "slider-right", "Color of slider right part.", new SettingColor(60, 40, 60));
+    public final Setting<SettingColor> sliderLeft = color(sgSlider, "slider-left", "Color of slider left part.", recolor(RecolorGuiTheme::getSliderLeft, new SettingColor(255, 79, 174, 220)));
+    public final Setting<SettingColor> sliderRight = color(sgSlider, "slider-right", "Color of slider right part.", recolor(RecolorGuiTheme::getSliderRight, new SettingColor(55, 25, 43, 220)));
 
     // Starscript
 
-    private final Setting<SettingColor> starscriptText = color(sgStarscript, "starscript-text", "Color of text in Starscript code.", new SettingColor(169, 183, 198));
-    private final Setting<SettingColor> starscriptBraces = color(sgStarscript, "starscript-braces", "Color of braces in Starscript code.", new SettingColor(150, 150, 150));
-    private final Setting<SettingColor> starscriptParenthesis = color(sgStarscript, "starscript-parenthesis", "Color of parenthesis in Starscript code.", new SettingColor(169, 183, 198));
-    private final Setting<SettingColor> starscriptDots = color(sgStarscript, "starscript-dots", "Color of dots in starscript code.", new SettingColor(169, 183, 198));
-    private final Setting<SettingColor> starscriptCommas = color(sgStarscript, "starscript-commas", "Color of commas in starscript code.", new SettingColor(169, 183, 198));
-    private final Setting<SettingColor> starscriptOperators = color(sgStarscript, "starscript-operators", "Color of operators in Starscript code.", new SettingColor(169, 183, 198));
-    private final Setting<SettingColor> starscriptStrings = color(sgStarscript, "starscript-strings", "Color of strings in Starscript code.", new SettingColor(106, 135, 89));
-    private final Setting<SettingColor> starscriptNumbers = color(sgStarscript, "starscript-numbers", "Color of numbers in Starscript code.", new SettingColor(104, 141, 187));
-    private final Setting<SettingColor> starscriptKeywords = color(sgStarscript, "starscript-keywords", "Color of keywords in Starscript code.", new SettingColor(204, 120, 50));
-    private final Setting<SettingColor> starscriptAccessedObjects = color(sgStarscript, "starscript-accessed-objects", "Color of accessed objects (before a dot) in Starscript code.", new SettingColor(152, 118, 170));
+    private final Setting<SettingColor> starscriptText = color(sgStarscript, "starscript-text", "Color of text in Starscript code.", recolor(RecolorGuiTheme::getStarscriptText, new SettingColor(169, 183, 198)));
+    private final Setting<SettingColor> starscriptBraces = color(sgStarscript, "starscript-braces", "Color of braces in Starscript code.", recolor(RecolorGuiTheme::getStarscriptBraces, new SettingColor(150, 150, 150)));
+    private final Setting<SettingColor> starscriptParenthesis = color(sgStarscript, "starscript-parenthesis", "Color of parenthesis in Starscript code.", recolor(RecolorGuiTheme::getStarscriptParenthesis, new SettingColor(169, 183, 198)));
+    private final Setting<SettingColor> starscriptDots = color(sgStarscript, "starscript-dots", "Color of dots in starscript code.", recolor(RecolorGuiTheme::getStarscriptDots, new SettingColor(169, 183, 198)));
+    private final Setting<SettingColor> starscriptCommas = color(sgStarscript, "starscript-commas", "Color of commas in starscript code.", recolor(RecolorGuiTheme::getStarscriptCommas, new SettingColor(169, 183, 198)));
+    private final Setting<SettingColor> starscriptOperators = color(sgStarscript, "starscript-operators", "Color of operators in Starscript code.", recolor(RecolorGuiTheme::getStarscriptOperators, new SettingColor(169, 183, 198)));
+    private final Setting<SettingColor> starscriptStrings = color(sgStarscript, "starscript-strings", "Color of strings in Starscript code.", recolor(RecolorGuiTheme::getStarscriptStrings, new SettingColor(106, 135, 89)));
+    private final Setting<SettingColor> starscriptNumbers = color(sgStarscript, "starscript-numbers", "Color of numbers in Starscript code.", recolor(RecolorGuiTheme::getStarscriptNumbers, new SettingColor(104, 141, 187)));
+    private final Setting<SettingColor> starscriptKeywords = color(sgStarscript, "starscript-keywords", "Color of keywords in Starscript code.", recolor(RecolorGuiTheme::getStarscriptKeywords, new SettingColor(204, 120, 50)));
+    private final Setting<SettingColor> starscriptAccessedObjects = color(sgStarscript, "starscript-accessed-objects", "Color of accessed objects (before a dot) in Starscript code.", recolor(RecolorGuiTheme::getStarscriptAccessedObjects, new SettingColor(152, 118, 170)));
 
     public MeteorGuiTheme() {
-        super("Bliss");
+        this("Bliss");
+    }
+
+    protected MeteorGuiTheme(String name) {
+        super(name);
 
         settingsFactory = new DefaultSettingsWidgetFactory(this);
     }
 
     private Setting<SettingColor> color(SettingGroup group, String name, String description, SettingColor color) {
         return group.add(new ColorSetting.Builder()
-                .name(name + "-color")
-                .description(description)
-                .defaultValue(color)
-                .build());
+            .name(name + "-color")
+            .description(description)
+            .defaultValue(color)
+            .build());
     }
+
     private Setting<SettingColor> color(String name, String description, SettingColor color) {
         return color(sgColors, name, description, color);
+    }
+
+    private <T> T recolor(Function<RecolorGuiTheme, T> getter, T fallback) {
+        return this instanceof RecolorGuiTheme theme ? getter.apply(theme) : fallback;
+    }
+
+    private ThreeStateColorSetting threeStateColor(SettingGroup group, String name, Function<RecolorGuiTheme, RecolorGuiTheme.TriColorSetting> getter, SettingColor c1, SettingColor c2, SettingColor c3) {
+        RecolorGuiTheme.TriColorSetting colors = recolor(getter, new RecolorGuiTheme.TriColorSetting(c1, c2, c3));
+        return new ThreeStateColorSetting(group, name, colors.c1(), colors.c2(), colors.c3());
     }
 
     // Widgets
@@ -370,8 +391,8 @@ public class MeteorGuiTheme extends GuiTheme {
     public double scale(double value) {
         double scaled = value * scale.get();
 
-        if (MacWindowUtil.IS_MAC) {
-            scaled /= (double) mc.getWindow().getWidth() / mc.getWindow().getFramebufferWidth();
+        if (MacosUtil.IS_MACOS) {
+            scaled /= (double) mc.getWindow().getWidth() / mc.getWindow().getWidth();
         }
 
         return scaled;

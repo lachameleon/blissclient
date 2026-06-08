@@ -3,8 +3,6 @@ package dev.stardust.discordchat;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import dev.stardust.Stardust;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 import org.java_websocket.WebSocket;
 import org.java_websocket.drafts.Draft;
 import org.java_websocket.exceptions.InvalidDataException;
@@ -23,6 +21,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 public class DiscordWebSocketServer extends WebSocketServer {
     private static final Gson GSON = new Gson();
@@ -120,7 +120,7 @@ public class DiscordWebSocketServer extends WebSocketServer {
         if (playerName != null) response.addProperty("playerName", playerName);
         conn.send(GSON.toJson(response));
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
             new Thread(() -> {
                 try {
@@ -147,7 +147,7 @@ public class DiscordWebSocketServer extends WebSocketServer {
 
     private String getPlayerName() {
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client == null) return null;
 
             if (client.player != null) {
@@ -165,8 +165,8 @@ public class DiscordWebSocketServer extends WebSocketServer {
             }
 
             try {
-                if (client.getSession() != null) {
-                    String name = client.getSession().getUsername();
+                if (client.getUser() != null) {
+                    String name = client.getUser().getName();
                     if (name != null && !name.isEmpty() && !name.equals("Player")) return name;
                 }
             } catch (Exception ignored) {
@@ -255,8 +255,8 @@ public class DiscordWebSocketServer extends WebSocketServer {
 
     public long getCurrentServerTick() {
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client != null && client.world != null) return client.world.getTime();
+            Minecraft client = Minecraft.getInstance();
+            if (client != null && client.level != null) return client.level.getGameTime();
         } catch (Exception ignored) {
         }
         return -1;
@@ -287,9 +287,9 @@ public class DiscordWebSocketServer extends WebSocketServer {
 
     private void sendPlayerInfo(WebSocket conn) {
         String playerName = getPlayerName();
-        MinecraftClient client = MinecraftClient.getInstance();
-        boolean inWorld = client != null && client.world != null;
-        boolean inMultiplayer = client != null && client.world != null && !client.isInSingleplayer();
+        Minecraft client = Minecraft.getInstance();
+        boolean inWorld = client != null && client.level != null;
+        boolean inMultiplayer = client != null && client.level != null && !client.isLocalServer();
 
         JsonObject json = new JsonObject();
         json.addProperty("type", "player_info");
@@ -381,13 +381,13 @@ public class DiscordWebSocketServer extends WebSocketServer {
     }
 
     private void showConnectionNotification(boolean connected) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null && client.player != null) {
             client.execute(() -> {
                 String message = connected
                     ? "§a[Discord] Connected to Discord chat bridge"
                     : "§c[Discord] Disconnected from Discord chat bridge";
-                client.player.sendMessage(Text.literal(message), false);
+                client.player.sendSystemMessage(Component.literal(message));
             });
         }
     }

@@ -4,8 +4,8 @@ import java.text.DecimalFormat;
 import dev.stardust.util.MsgUtil;
 import dev.stardust.hud.ConwayHud;
 import dev.stardust.util.StardustUtil;
-import net.minecraft.command.CommandSource;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.client.multiplayer.ClientSuggestionProvider;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.systems.hud.Hud;
@@ -62,7 +62,7 @@ public class Life extends Command {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<ClientSuggestionProvider> builder) {
         builder.then(literal("new").executes(ctx -> {
             Hud.get().forEach(element -> {
                 if (element instanceof ConwayHud hud) {
@@ -209,7 +209,7 @@ public class Life extends Command {
         if (rules.equals(ConwayHud.Ruleset.Custom)) {
             name = "Custom(" + hud.customRules.get().toUpperCase() + ")";
         } else {
-            name = rules.asString();
+            name = rules.getSerializedName();
         }
         StringBuilder sb = new StringBuilder();
 

@@ -1,14 +1,19 @@
 package dev.stardust.mixin;
 
 import java.util.Map;
-import net.minecraft.text.Text;
 import javax.annotation.Nullable;
-import net.minecraft.client.sound.*;
+import net.minecraft.client.resources.sounds.Sound;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.sounds.*;
+import net.minecraft.client.sounds.ChannelAccess;
+import net.minecraft.client.sounds.SoundEngine;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.*;
 import dev.stardust.modules.MusicTweaks;
-import net.minecraft.util.math.MathHelper;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import com.mojang.blaze3d.audio.Channel;
 import dev.stardust.mixin.accessor.SourceManagerAccessor;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -16,11 +21,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
  **/
-@Mixin(SoundSystem.class)
+@Mixin(SoundEngine.class)
 public class SoundSystemMixin {
     @Shadow
     @Final
-    private Map<SoundInstance, Channel.SourceManager> sources;
+    private Map<SoundInstance, ChannelAccess.ChannelHandle> instanceToChannel;
 
     @Unique
     @Mutable
@@ -32,7 +37,7 @@ public class SoundSystemMixin {
 
 
     // See MusicTweaks.java
-    @Inject(method = "tick()V", at = @At("TAIL"))
+    @Inject(method = "tickInGameSound()V", at = @At("TAIL"))
     private void mixinTick(CallbackInfo ci) {
         Modules modules = Modules.get();
         if (modules == null ) return;
@@ -40,17 +45,17 @@ public class SoundSystemMixin {
 
         boolean playing = false;
         @Nullable String songID = null;
-        for (SoundInstance instance : sources.keySet()) {
+        for (SoundInstance instance : instanceToChannel.keySet()) {
             Sound sound = instance.getSound();
             if (sound == null) continue;
 
-            String location = sound.getLocation().toString();
+            String location = sound.getPath().toString();
             if (!location.startsWith("minecraft:sounds/music/") && !sound.toString().contains("minecraft:records/")) continue;
-            Channel.SourceManager sourceManager = this.sources.get(instance);
+            ChannelAccess.ChannelHandle sourceManager = this.instanceToChannel.get(instance);
             songID = location.substring(location.lastIndexOf('/') + 1);
 
             if (sourceManager == null) continue;
-            Source source = ((SourceManagerAccessor) sourceManager).getSource();
+            Channel source = ((SourceManagerAccessor) sourceManager).getSource();
             if (source == null) continue;
 
             playing = true;
@@ -67,10 +72,10 @@ public class SoundSystemMixin {
             }
             if (tweaks.isActive()) {
                 this.dirtyVolume = true;
-                source.setVolume(MathHelper.clamp(tweaks.getClient().options.getSoundVolume(instance.getCategory()) + tweaks.getVolumeAdjustment(), 0.0f, 4.0f));
+                source.setVolume(Mth.clamp(tweaks.getClient().options.getFinalSoundSourceVolume(instance.getSource()) + tweaks.getVolumeAdjustment(), 0.0f, 4.0f));
             } else if (this.dirtyVolume) {
                 this.dirtyVolume = false;
-                source.setVolume(tweaks.getClient().options.getSoundVolume(instance.getCategory()));
+                source.setVolume(tweaks.getClient().options.getFinalSoundSourceVolume(instance.getSource()));
             }
         }
         if (playing) {
@@ -86,7 +91,7 @@ public class SoundSystemMixin {
                 // See NarratorManagerMixin.java lol
                 switch (tweaks.getDisplayMode()) {
                     case Chat -> tweaks.sendNowPlayingMessage(songName);
-                    case Record -> tweaks.getClient().inGameHud.setRecordPlayingOverlay(Text.of(songName));
+                    case Record -> tweaks.getClient().gui.setNowPlaying(Component.nullToEmpty(songName));
                 }
             }
         }

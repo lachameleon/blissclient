@@ -24,7 +24,7 @@ import java.util.List;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class Fonts {
-    public static final String[] BUILTIN_FONTS = { "JetBrains Mono", "Comfortaa", "Tw Cen MT", "Pixelation" };
+    public static final String[] BUILTIN_FONTS = {"JetBrains Mono", "Comfortaa", "Tw Cen MT", "Pixelation"};
 
     public static String DEFAULT_FONT_FAMILY;
     public static FontFace DEFAULT_FONT;
@@ -51,9 +51,7 @@ public class Fonts {
 
         MeteorClient.LOG.info("Found {} font families.", FONT_FAMILIES.size());
 
-        // Prefer Lexend if available, otherwise fall back to the existing Comfortaa default.
-        FontFamily lexend = findFirstFamilyContaining("lexend");
-        DEFAULT_FONT_FAMILY = lexend != null ? lexend.getName() : FontUtils.getBuiltinFontInfo(BUILTIN_FONTS[1]).family();
+        DEFAULT_FONT_FAMILY = FontUtils.getBuiltinFontInfo(BUILTIN_FONTS[1]).family();
         DEFAULT_FONT = getFamily(DEFAULT_FONT_FAMILY).get(FontInfo.Type.Regular);
 
         Config config = Config.get();
@@ -69,8 +67,7 @@ public class Fonts {
         try {
             RENDERER = new CustomTextRenderer(fontFace);
             MeteorClient.EVENT_BUS.post(CustomFontChangedEvent.get());
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             if (fontFace.equals(DEFAULT_FONT)) {
                 throw new RuntimeException("Failed to load default font: " + fontFace, e);
             }
@@ -79,18 +76,9 @@ public class Fonts {
             load(Fonts.DEFAULT_FONT);
         }
 
-        if (mc.currentScreen instanceof WidgetScreen && Config.get().customFont.get()) {
-            ((WidgetScreen) mc.currentScreen).invalidate();
+        if (mc.screen instanceof WidgetScreen widgetScreen && Config.get().customFont.get()) {
+            widgetScreen.invalidate();
         }
-    }
-
-    private static FontFamily findFirstFamilyContaining(String needle) {
-        for (FontFamily family : FONT_FAMILIES) {
-            if (family.getName().toLowerCase().contains(needle.toLowerCase())) {
-                return family;
-            }
-        }
-        return null;
     }
 
     public static FontFamily getFamily(String name) {

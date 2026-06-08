@@ -5,7 +5,6 @@
 
 package meteordevelopment.meteorclient.gui;
 
-import meteordevelopment.meteorclient.MeteorClient;
 import dev.stardust.gui.themes.DarkTheme;
 import dev.stardust.gui.themes.LambdaTheme;
 import dev.stardust.gui.themes.MidnightTheme;
@@ -13,10 +12,11 @@ import dev.stardust.gui.themes.MonochromeTheme;
 import dev.stardust.gui.themes.PhosphorTheme;
 import dev.stardust.gui.themes.SnowyTheme;
 import dev.stardust.gui.themes.StardustTheme;
+import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 import meteordevelopment.meteorclient.utils.PostInit;
 import meteordevelopment.meteorclient.utils.PreInit;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 
 import java.io.File;
@@ -38,24 +38,24 @@ public class GuiThemes {
 
     @PreInit
     public static void init() {
-        add(new MeteorGuiTheme());
-        add(DarkTheme.INSTANCE);
-        add(SnowyTheme.INSTANCE);
-        add(LambdaTheme.INSTANCE);
         add(StardustTheme.INSTANCE);
+        add(DarkTheme.INSTANCE);
         add(MidnightTheme.INSTANCE);
-        add(PhosphorTheme.INSTANCE);
+        add(SnowyTheme.INSTANCE);
         add(MonochromeTheme.INSTANCE);
+        add(LambdaTheme.INSTANCE);
+        add(PhosphorTheme.INSTANCE);
+        add(new MeteorGuiTheme());
     }
 
     @PostInit
     public static void postInit() {
         if (FILE.exists()) {
             try {
-                NbtCompound tag = NbtIo.read(FILE.toPath());
+                CompoundTag tag = NbtIo.read(FILE.toPath());
 
                 if (tag != null) {
-                    String currentTheme = tag.getString("currentTheme", "");
+                    String currentTheme = tag.getStringOr("currentTheme", "");
                     if ("Meteor".equals(currentTheme)) currentTheme = "Bliss";
                     select(currentTheme);
                 }
@@ -68,7 +68,7 @@ public class GuiThemes {
     }
 
     public static void add(GuiTheme theme) {
-        for (ListIterator<GuiTheme> it = themes.listIterator(); it.hasNext();) {
+        for (ListIterator<GuiTheme> it = themes.listIterator(); it.hasNext(); ) {
             if (it.next().name.equals(theme.name)) {
                 // Replace the old one with same name
                 it.set(theme);
@@ -104,7 +104,7 @@ public class GuiThemes {
                 File file = new File(THEMES_FOLDER, get().name + ".nbt");
 
                 if (file.exists()) {
-                    NbtCompound tag = NbtIo.read(file.toPath());
+                    CompoundTag tag = NbtIo.read(file.toPath());
                     if (tag != null) get().fromTag(tag);
                 }
             } catch (IOException e) {
@@ -135,7 +135,7 @@ public class GuiThemes {
     private static void saveTheme() {
         if (get() != null) {
             try {
-                NbtCompound tag = get().toTag();
+                CompoundTag tag = get().toTag();
 
                 THEMES_FOLDER.mkdirs();
                 NbtIo.write(tag, new File(THEMES_FOLDER, get().name + ".nbt").toPath());
@@ -147,7 +147,7 @@ public class GuiThemes {
 
     private static void saveGlobal() {
         try {
-            NbtCompound tag = new NbtCompound();
+            CompoundTag tag = new CompoundTag();
             tag.putString("currentTheme", get().name);
 
             FOLDER.mkdirs();

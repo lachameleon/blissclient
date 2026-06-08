@@ -7,6 +7,10 @@ import meteordevelopment.meteorclient.gui.themes.meteor.MeteorGuiTheme;
 public class SnowyTheme extends MeteorGuiTheme implements RecolorGuiTheme {
     public static final SnowyTheme INSTANCE = new SnowyTheme();
 
+    public SnowyTheme() {
+        super("Snowy");
+    }
+
     @Override
     public String getName() {
         return "Snowy";

@@ -1,7 +1,6 @@
 package dev.stardust.mixin.meteor;
 
 import java.util.UUID;
-import net.minecraft.text.Text;
 import dev.stardust.util.StardustUtil;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,18 +10,19 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.ThreadLocalRandom;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import net.minecraft.util.collection.ArrayListDeque;
-import net.minecraft.client.network.PlayerListEntry;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.EnumSetting;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Category;
-import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerRemoveS2CPacket;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import meteordevelopment.meteorclient.systems.modules.misc.Notifier;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.util.ArrayListDeque;
 
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
@@ -40,7 +40,7 @@ public abstract class NotifierMixin extends Module {
     private SettingGroup sgJoinsLeaves;
     @Shadow
     @Final
-    private ArrayListDeque<Text> messageQueue;
+    private ArrayListDeque<Component> messageQueue;
 
     @Unique
     @Nullable
@@ -89,11 +89,11 @@ public abstract class NotifierMixin extends Module {
     }
 
     @Inject(method = "createJoinNotifications", at = @At("HEAD"), cancellable = true)
-    private void greetPlayers(PlayerListS2CPacket packet, CallbackInfo ci) {
+    private void greetPlayers(ClientboundPlayerInfoUpdatePacket packet, CallbackInfo ci) {
         if (greeterNotifications == null || !greeterNotifications.get()) return;
 
         ci.cancel();
-        for (PlayerListS2CPacket.Entry entry : packet.getPlayerAdditionEntries()) {
+        for (ClientboundPlayerInfoUpdatePacket.Entry entry : packet.newEntries()) {
             if (entry.profile() == null) continue;
 
             String name = entry.profile().name();
@@ -101,21 +101,21 @@ public abstract class NotifierMixin extends Module {
             int luckyInt = ThreadLocalRandom.current().nextInt(3);
             if (luckyInt == 0) {
                 String greeting = suffixGreetings[ThreadLocalRandom.current().nextInt(suffixGreetings.length)];
-                messageQueue.addLast(Text.of("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §a" + format + name + " §7" + format + greeting + "§a" + format + "."));
+                messageQueue.addLast(Component.nullToEmpty("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §a" + format + name + " §7" + format + greeting + "§a" + format + "."));
             } else {
                 String greeting = prefixGreetings[ThreadLocalRandom.current().nextInt(prefixGreetings.length)];
-                messageQueue.addLast(Text.of("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §7" + format + greeting + ", §a" + format + name + "§7" + format + "."));
+                messageQueue.addLast(Component.nullToEmpty("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §7" + format + greeting + ", §a" + format + name + "§7" + format + "."));
             }
         }
     }
 
     @Inject(method = "createLeaveNotification", at = @At("HEAD"), cancellable = true)
-    private void bidFarewell(PlayerRemoveS2CPacket packet, CallbackInfo ci) {
-        if (mc.getNetworkHandler() == null || greeterNotifications == null || !greeterNotifications.get()) return;
+    private void bidFarewell(ClientboundPlayerInfoRemovePacket packet, CallbackInfo ci) {
+        if (mc.getConnection() == null || greeterNotifications == null || !greeterNotifications.get()) return;
 
         ci.cancel();
         for (UUID id : packet.profileIds()) {
-            PlayerListEntry player = mc.getNetworkHandler().getPlayerListEntry(id);
+            PlayerInfo player = mc.getConnection().getPlayerInfo(id);
             if (player == null) continue;
 
             String name = player.getProfile().name();
@@ -123,10 +123,10 @@ public abstract class NotifierMixin extends Module {
             int luckyInt = ThreadLocalRandom.current().nextInt(3);
             if (luckyInt == 0) {
                 String farewell = suffixFarewells[ThreadLocalRandom.current().nextInt(suffixFarewells.length)];
-                messageQueue.addLast(Text.of("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §c" + format + name + " §7" + format + farewell + "§c" + format + "."));
+                messageQueue.addLast(Component.nullToEmpty("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §c" + format + name + " §7" + format + farewell + "§c" + format + "."));
             } else {
                 String farewell = prefixFarewells[ThreadLocalRandom.current().nextInt(prefixFarewells.length)];
-                messageQueue.addLast(Text.of("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §7" + format + farewell + ", §c" + format + name + "§7" + format + "."));
+                messageQueue.addLast(Component.nullToEmpty("§8<"+ StardustUtil.rCC()+"§o✨§r§8> §7" + format + farewell + ", §c" + format + name + "§7" + format + "."));
             }
         }
     }

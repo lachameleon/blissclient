@@ -4,8 +4,6 @@ import java.util.Set;
 import java.util.HashSet;
 import dev.stardust.Stardust;
 import dev.stardust.util.MsgUtil;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.StringIdentifiable;
 import java.util.concurrent.ThreadLocalRandom;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.gui.GuiTheme;
@@ -19,6 +17,8 @@ import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.systems.hud.HudElementInfo;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import net.minecraft.util.Mth;
+import net.minecraft.util.StringRepresentable;
 import meteordevelopment.meteorclient.utils.render.color.RainbowColors;
 import meteordevelopment.meteorclient.gui.widgets.containers.WHorizontalList;
 
@@ -40,7 +40,7 @@ public class ConwayHud extends HudElement {
     public enum ColorScheme {
         Dynamic, Bichromatic, Trippy, Stabilizing
     }
-    public enum Ruleset implements StringIdentifiable {
+    public enum Ruleset implements StringRepresentable {
         Random(""),
         Cyclic("C"),
         Standard("B3/S23"),
@@ -58,7 +58,7 @@ public class ConwayHud extends HudElement {
         }
 
         @Override
-        public String asString() {
+        public String getSerializedName() {
             return switch (this) {
                 case Custom -> "Custom";
                 case Cyclic -> "Cyclic";
@@ -80,7 +80,7 @@ public class ConwayHud extends HudElement {
         new EnumSetting.Builder<Ruleset>()
             .name("simulation-rules")
             .defaultValue(Ruleset.Standard)
-            .description(Ruleset.Standard.asString())
+            .description(Ruleset.Standard.getSerializedName())
             .onChanged(it -> {
                 switch (it) {
                     case Cyclic -> this.seedDensity.set(0.69);
@@ -411,7 +411,7 @@ public class ConwayHud extends HudElement {
                                 aliveColor.get().r,
                                 aliveColor.get().g,
                                 aliveColor.get().b,
-                                MathHelper.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
+                                Mth.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
                             );
                         }
                     } else {
@@ -419,7 +419,7 @@ public class ConwayHud extends HudElement {
                             aliveColor.get().r,
                             aliveColor.get().g,
                             aliveColor.get().b,
-                            MathHelper.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
+                            Mth.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
                         );
                     }
                     hud.quad(this.x + x * CELL_SIZE, this.y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE, color);
@@ -439,10 +439,10 @@ public class ConwayHud extends HudElement {
         if (!isVisible) return true;
         switch (visibility.get()) {
             case Widgets -> {
-                if (!(mc.currentScreen instanceof WidgetScreen)) return true;
+                if (!(mc.screen instanceof WidgetScreen)) return true;
             }
             case Windows -> {
-                if (mc.currentScreen == null) return true;
+                if (mc.screen == null) return true;
             }
         }
 
@@ -606,7 +606,7 @@ public class ConwayHud extends HudElement {
             temp.getRed() / 255f,
             temp.getGreen() / 255f,
             temp.getBlue() / 255f,
-            MathHelper.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
+            Mth.clamp(grid[x][y], minAlpha.get(), maxAlpha.get())
         );
     }
 
@@ -692,7 +692,7 @@ public class ConwayHud extends HudElement {
     }
 
     private void alterOwnDescription(Ruleset set) {
-        ((SettingAccessor) rules).setDescription(set.asString());
+        ((SettingAccessor) rules).setDescription(set.getSerializedName());
     }
 
     public record Rules(Ruleset rules, Set<Integer> birthSet, Set<Integer> survivalSet, boolean randomize, boolean cyclic) {

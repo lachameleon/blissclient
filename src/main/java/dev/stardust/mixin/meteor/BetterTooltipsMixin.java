@@ -1,13 +1,11 @@
 package dev.stardust.mixin.meteor;
 
-import net.minecraft.text.Text;
 import javax.annotation.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import net.minecraft.component.DataComponentTypes;
 import org.spongepowered.asm.mixin.injection.Inject;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.BoolSetting;
@@ -17,6 +15,8 @@ import meteordevelopment.meteorclient.systems.modules.Category;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import meteordevelopment.meteorclient.events.game.ItemStackTooltipEvent;
 import meteordevelopment.meteorclient.systems.modules.render.BetterTooltips;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
@@ -73,17 +73,17 @@ public class BetterTooltipsMixin extends Module {
 
     @Inject(method = "appendTooltip", at = @At("TAIL"))
     private void appendDurabilityTooltip(ItemStackTooltipEvent event, CallbackInfo ci) {
-        if (!event.itemStack().isDamageable()) return;
+        if (!event.itemStack().isDamageableItem()) return;
 
         int maxDamage = event.itemStack().getMaxDamage();
-        int damage = event.itemStack().getOrDefault(DataComponentTypes.DAMAGE, event.itemStack().getDamage());
+        int damage = event.itemStack().getOrDefault(DataComponents.DAMAGE, event.itemStack().getDamageValue());
 
         if (rawDamageTag != null && rawDamageTag.get()) {
-            event.appendEnd(Text.literal("§7Damage§3: §a§o" + damage + " §8[§7Max§3: §a§o" + maxDamage + "§8]"));
+            event.appendEnd(Component.literal("§7Damage§3: §a§o" + damage + " §8[§7Max§3: §a§o" + maxDamage + "§8]"));
         }
         if (trueDurability != null && trueDurability.get()) {
             int durability = maxDamage - damage;
-            event.appendEnd(Text.literal("§7Durability§3: §a§o" + durability + " §8[§7Max§3: §a§o" + maxDamage + "§8]"));
+            event.appendEnd(Component.literal("§7Durability§3: §a§o" + durability + " §8[§7Max§3: §a§o" + maxDamage + "§8]"));
         }
     }
 }
