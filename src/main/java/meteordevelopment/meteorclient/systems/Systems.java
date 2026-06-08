@@ -5,6 +5,7 @@
 
 package meteordevelopment.meteorclient.systems;
 
+import dev.stardust.playertracker.PlayerTracker;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
@@ -51,6 +52,7 @@ public class Systems {
         add(new Waypoints());
         add(new Profiles());
         add(new Proxies());
+        add(new PlayerTracker());
         add(new Hud());
 
         MeteorClient.EVENT_BUS.subscribe(Systems.class);

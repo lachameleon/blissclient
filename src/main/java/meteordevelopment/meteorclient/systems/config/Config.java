@@ -166,7 +166,7 @@ public class Config extends System<Config> {
 
             AutoWalk.class, Sprint.class, AutoWasp.class,
 
-            AutoReconnect.class, AutoSleep.class, BetterChat.class, DiscordPresence.class, InventoryTweaks.class,
+            AutoReconnect.class, AutoSleep.class, BetterChat.class, InventoryTweaks.class,
             Notebot.class, Notifier.class, SoundBlocker.class,
 
             MusicTweaks.class, BannerData.class, LoreLocator.class, Loadouts.class, AutoDoors.class,

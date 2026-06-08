@@ -1,15 +1,11 @@
 package dev.stardust.modules;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.authlib.exceptions.AuthenticationException;
 import dev.stardust.blisschat.BlissChatClient;
+import dev.stardust.playertracker.PlayerTracker;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
-import meteordevelopment.meteorclient.settings.BoolSetting;
-import meteordevelopment.meteorclient.settings.Setting;
-import meteordevelopment.meteorclient.settings.SettingGroup;
-import meteordevelopment.meteorclient.settings.StringSetting;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
@@ -24,53 +20,13 @@ import net.minecraft.network.chat.TextColor;
 import net.minecraft.util.Util;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.UUID;
 
 public class BlissChat extends Module {
-    private static final int PINK = 0xFF73BE;
+    private static final String DEFAULT_BACKEND_URL = "wss://blissclientbackend.hogridersupercell123.workers.dev/chat";
+    private static final URI BACKEND_URI = URI.create(DEFAULT_BACKEND_URL);
     private static final int HOT_PINK = 0xFF4FA8;
     private static final int BLUE = 0x65D6FF;
-
-    private final SettingGroup sgGeneral = settings.getDefaultGroup();
-
-    private final Setting<String> backendUrl = sgGeneral.add(new StringSetting.Builder()
-        .name("backend-url")
-        .description("Cloudflare Worker WebSocket URL for Bliss chat.")
-        .defaultValue("wss://blissclientbackend.hogridersupercell123.workers.dev/chat")
-        .onChanged(value -> {
-            if (isActive()) reconnect();
-        })
-        .build()
-    );
-
-    private final Setting<Boolean> autoConnect = sgGeneral.add(new BoolSetting.Builder()
-        .name("auto-connect")
-        .description("Connect automatically after joining a multiplayer server.")
-        .defaultValue(true)
-        .build()
-    );
-
-    private final Setting<Boolean> showStatusMessages = sgGeneral.add(new BoolSetting.Builder()
-        .name("show-status-messages")
-        .description("Show Bliss chat connection messages in chat.")
-        .defaultValue(true)
-        .build()
-    );
-
-    private final Setting<Boolean> showHistory = sgGeneral.add(new BoolSetting.Builder()
-        .name("show-history")
-        .description("Show recent backend messages after connecting.")
-        .defaultValue(true)
-        .build()
-    );
-
-    private final Setting<Boolean> showPresence = sgGeneral.add(new BoolSetting.Builder()
-        .name("show-presence")
-        .description("Show join and leave messages from Bliss chat.")
-        .defaultValue(true)
-        .build()
-    );
 
     private BlissChatClient client;
 
@@ -81,7 +37,7 @@ public class BlissChat extends Module {
 
     @Override
     public void onActivate() {
-        if (autoConnect.get() && mc.player != null) connect();
+        if (mc.player != null) connect();
     }
 
     @Override
@@ -95,10 +51,8 @@ public class BlissChat extends Module {
     }
 
     public void connectOnServerJoin() {
-        if (!autoConnect.get()) return;
-
         mc.execute(() -> {
-            if (!autoConnect.get() || mc.player == null || mc.getCurrentServer() == null) return;
+            if (mc.player == null || mc.getCurrentServer() == null) return;
 
             if (!isActive()) enable();
             else connect();
@@ -137,12 +91,20 @@ public class BlissChat extends Module {
         sendLine(Component.literal("Status: ").withStyle(ChatFormatting.GRAY)
             .append(Component.literal(status).withStyle(color))
             .append(Component.literal(" | Backend: ").withStyle(ChatFormatting.GRAY))
-            .append(Component.literal(backendUrl.get()).withStyle(ChatFormatting.WHITE)));
+            .append(Component.literal(DEFAULT_BACKEND_URL).withStyle(ChatFormatting.WHITE)));
     }
 
     public void reconnect() {
         disconnect("Reconnecting.");
         connect();
+    }
+
+    public void reportSeenPlayer(PlayerTracker.SightingReport report) {
+        if (report == null || mc.player == null || mc.getCurrentServer() == null) return;
+
+        if (!isActive()) enable();
+        BlissChatClient current = connect();
+        if (current != null) current.sendSeenPlayer(report);
     }
 
     public void authenticate(BlissChatClient socket, String challenge) {
@@ -173,38 +135,22 @@ public class BlissChat extends Module {
     }
 
     public void onSocketOpened(BlissChatClient socket) {
-        if (socket != client) return;
-        showStatusLine("Connected to backend. Waiting for auth challenge.", ChatFormatting.GRAY);
     }
 
     public void onAuthenticated(BlissChatClient socket) {
-        if (socket != client) return;
-        showStatusLine("Online-mode session verified.", ChatFormatting.GREEN);
     }
 
     public void onSocketClosed(BlissChatClient socket, int code, String reason, boolean remote, boolean wasReady) {
         if (socket == client) client = null;
-        if (wasReady || code != 1000) {
+        if (code != 1000 && wasReady) {
             String detail = reason == null || reason.isBlank() ? "code " + code : reason;
-            showStatusLine("Disconnected from Bliss chat: " + detail, remote ? ChatFormatting.YELLOW : ChatFormatting.GRAY);
+            showError("Disconnected from Bliss chat: " + detail);
         }
     }
 
     public void onSocketError(BlissChatClient socket, Exception ex) {
         if (socket != client) return;
         showError("Bliss chat connection failed: " + message(ex));
-    }
-
-    public void displayHistory(JsonArray messages) {
-        if (!showHistory.get() || messages.isEmpty()) return;
-
-        sendLine(Component.literal("Bliss Chat")
-            .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(PINK)).withBold(true))
-            .append(Component.literal(" recent messages").withStyle(ChatFormatting.GRAY)));
-
-        for (JsonElement element : messages) {
-            if (element != null && element.isJsonObject()) displayChatMessage(element.getAsJsonObject());
-        }
     }
 
     public void displayChatMessage(JsonObject json) {
@@ -228,22 +174,6 @@ public class BlissChat extends Module {
         sendRawLine(line);
     }
 
-    public void displayPresence(JsonObject json) {
-        if (!showPresence.get()) return;
-
-        String action = string(json, "action", "");
-        String username = string(json, "username", "Unknown");
-        String serverAddress = string(json, "serverAddress", "unknown");
-        if (!"join".equals(action) && !"leave".equals(action)) return;
-
-        ChatFormatting color = "join".equals(action) ? ChatFormatting.GREEN : ChatFormatting.RED;
-        sendLine(Component.literal(username).withStyle(color)
-            .append(Component.literal(" " + ("join".equals(action) ? "joined" : "left") + " Bliss chat")
-                .withStyle(ChatFormatting.GRAY)
-                .withStyle(style -> style.withHoverEvent(new HoverEvent.ShowText(Component.literal("Playing on: " + serverAddress)
-                    .withStyle(ChatFormatting.GRAY))))));
-    }
-
     public void showError(String message) {
         showStatusLine(message, ChatFormatting.RED);
     }
@@ -257,17 +187,8 @@ public class BlissChat extends Module {
         BlissChatClient current = client;
         if (current != null && (current.isOpen() || current.isConnecting())) return current;
 
-        URI uri;
-        try {
-            uri = new URI(backendUrl.get());
-        } catch (URISyntaxException e) {
-            showError("Invalid backend URL: " + backendUrl.get());
-            return null;
-        }
-
-        current = new BlissChatClient(this, uri);
+        current = new BlissChatClient(this, BACKEND_URI);
         client = current;
-        showStatusLine("Connecting to Bliss chat...", ChatFormatting.GRAY);
         current.connect();
         return current;
     }
@@ -298,7 +219,6 @@ public class BlissChat extends Module {
     }
 
     private void showStatusLine(String message, ChatFormatting color) {
-        if (!showStatusMessages.get()) return;
         sendLine(Component.literal(message).withStyle(color));
     }
 

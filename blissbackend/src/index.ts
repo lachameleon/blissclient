@@ -45,6 +45,24 @@ interface ServerMetricRow extends Record<string, SqlStorageValue> {
   sessions: number;
 }
 
+interface PlayerSighting {
+  seenUsername: string;
+  seenUuid: string;
+  serverAddress: string;
+  dimension: string;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+  health: number;
+  maxHealth: number;
+  ping: number;
+  gameMode: string;
+  sightingCount: number;
+  totalVisibleMs: number;
+  visibleMs: number;
+}
+
 interface MojangProfile {
   id: string;
   name: string;
@@ -53,6 +71,7 @@ interface MojangProfile {
 const MAX_MESSAGE_LENGTH = 240;
 const MESSAGE_COOLDOWN_MS = 750;
 const HISTORY_LIMIT = 75;
+const SIGHTING_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -114,6 +133,32 @@ export class ChatRoom extends DurableObject<Env> {
         server_address TEXT NOT NULL
       )
     `);
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS player_sightings (
+        id TEXT PRIMARY KEY,
+        timestamp INTEGER NOT NULL,
+        reporter_username TEXT NOT NULL,
+        reporter_uuid TEXT NOT NULL,
+        reporter_server_address TEXT NOT NULL,
+        seen_username TEXT NOT NULL,
+        seen_uuid TEXT NOT NULL,
+        seen_server_address TEXT NOT NULL,
+        dimension TEXT NOT NULL,
+        x REAL NOT NULL,
+        y REAL NOT NULL,
+        z REAL NOT NULL,
+        distance REAL NOT NULL,
+        health REAL NOT NULL,
+        max_health REAL NOT NULL,
+        ping INTEGER NOT NULL,
+        game_mode TEXT NOT NULL,
+        sighting_count INTEGER NOT NULL,
+        total_visible_ms INTEGER NOT NULL,
+        visible_ms INTEGER NOT NULL
+      )
+    `);
+    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_timestamp ON player_sightings (timestamp)");
+    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_seen_uuid ON player_sightings (seen_uuid)");
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -167,6 +212,9 @@ export class ChatRoom extends DurableObject<Env> {
         return;
       case "chat":
         this.publishChat(ws, attachment, payload);
+        return;
+      case "seen_player":
+        this.recordPlayerSighting(ws, attachment, payload);
         return;
       default:
         this.sendError(ws, "Unsupported message type.");
@@ -247,7 +295,6 @@ export class ChatRoom extends DurableObject<Env> {
       uuid: attachment.uuid,
       serverAddress: attachment.serverAddress
     });
-    this.sendHistory(ws);
     this.sendPresence(ws);
     this.recordPresence("join", attachment, timestamp);
     this.broadcast({
@@ -307,6 +354,71 @@ export class ChatRoom extends DurableObject<Env> {
     );
 
     this.broadcast(chatMessage);
+    this.broadcastStats();
+  }
+
+  private recordPlayerSighting(ws: WebSocket, attachment: ClientAttachment, payload: JsonObject): void {
+    if (attachment.role !== "client" || !attachment.username || !attachment.uuid || !attachment.serverAddress) {
+      this.sendError(ws, "Authenticate from an online-mode Minecraft client first.");
+      return;
+    }
+
+    const sighting = sanitizePlayerSighting(payload, attachment.serverAddress);
+    if (!sighting) {
+      this.sendError(ws, "Invalid player sighting.");
+      return;
+    }
+
+    const timestamp = Date.now();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO player_sightings (
+        id,
+        timestamp,
+        reporter_username,
+        reporter_uuid,
+        reporter_server_address,
+        seen_username,
+        seen_uuid,
+        seen_server_address,
+        dimension,
+        x,
+        y,
+        z,
+        distance,
+        health,
+        max_health,
+        ping,
+        game_mode,
+        sighting_count,
+        total_visible_ms,
+        visible_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      crypto.randomUUID(),
+      timestamp,
+      attachment.username,
+      attachment.uuid,
+      attachment.serverAddress,
+      sighting.seenUsername,
+      sighting.seenUuid,
+      sighting.serverAddress,
+      sighting.dimension,
+      sighting.x,
+      sighting.y,
+      sighting.z,
+      sighting.distance,
+      sighting.health,
+      sighting.maxHealth,
+      sighting.ping,
+      sighting.gameMode,
+      sighting.sightingCount,
+      sighting.totalVisibleMs,
+      sighting.visibleMs
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM player_sightings WHERE timestamp < ?",
+      timestamp - SIGHTING_RETENTION_MS
+    );
+
     this.broadcastStats();
   }
 
@@ -434,6 +546,7 @@ export class ChatRoom extends DurableObject<Env> {
     const onlineServers = new Set(onlineUsers.map(user => user.serverAddress));
     const roles = this.roleCounts();
     const latestMessageAt = this.firstNumber("SELECT MAX(timestamp) AS value FROM messages");
+    const latestSightingAt = this.firstNumber("SELECT MAX(timestamp) AS value FROM player_sightings");
 
     return {
       generatedAt: now,
@@ -447,10 +560,15 @@ export class ChatRoom extends DurableObject<Env> {
       totalMessages: this.firstNumber("SELECT COUNT(*) AS value FROM messages"),
       messagesLast15m: this.firstNumber("SELECT COUNT(*) AS value FROM messages WHERE timestamp >= ?", now - 15 * 60 * 1000),
       messagesLastHour: this.firstNumber("SELECT COUNT(*) AS value FROM messages WHERE timestamp >= ?", now - 60 * 60 * 1000),
+      totalSightings: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings"),
+      sightingsLast15m: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings WHERE timestamp >= ?", now - 15 * 60 * 1000),
+      sightingsLastHour: this.firstNumber("SELECT COUNT(*) AS value FROM player_sightings WHERE timestamp >= ?", now - 60 * 60 * 1000),
+      uniqueSeenPlayers: this.firstNumber("SELECT COUNT(DISTINCT seen_uuid) AS value FROM player_sightings"),
       joinsLastHour: this.firstNumber("SELECT COUNT(*) AS value FROM presence_events WHERE action = 'join' AND timestamp >= ?", now - 60 * 60 * 1000),
       averageSessionMinutes: this.firstNumber("SELECT AVG((COALESCE(disconnected_at, ?) - connected_at) / 60000.0) AS value FROM sessions", now),
       busiestServer: this.firstString("SELECT server_address AS value FROM sessions GROUP BY server_address ORDER BY COUNT(*) DESC, MAX(connected_at) DESC LIMIT 1"),
       latestMessageAt,
+      latestSightingAt,
       topServers: this.topServers()
     };
   }
@@ -509,10 +627,15 @@ interface DashboardStats {
   totalMessages: number;
   messagesLast15m: number;
   messagesLastHour: number;
+  totalSightings: number;
+  sightingsLast15m: number;
+  sightingsLastHour: number;
+  uniqueSeenPlayers: number;
   joinsLastHour: number;
   averageSessionMinutes: number;
   busiestServer: string;
   latestMessageAt: number;
+  latestSightingAt: number;
   topServers: Array<{ serverAddress: string; sessions: number; online: number }>;
 }
 
@@ -581,6 +704,50 @@ function sanitizeChatMessage(value: unknown): string | null {
   const message = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
   if (!message) return null;
   return message.slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function sanitizePlayerSighting(payload: JsonObject, fallbackServerAddress: string): PlayerSighting | null {
+  const seenUsername = sanitizeUsername(payload.seenUsername);
+  const seenUuid = sanitizeUuid(payload.seenUuid);
+  const serverAddress = sanitizeServerAddress(payload.serverAddress) ?? fallbackServerAddress;
+  const dimension = sanitizeLabel(payload.dimension, 120) ?? "unknown";
+  const gameMode = sanitizeLabel(payload.gameMode, 32) ?? "unknown";
+
+  if (!seenUsername || !seenUuid || !serverAddress) return null;
+
+  return {
+    seenUsername,
+    seenUuid,
+    serverAddress,
+    dimension,
+    x: finiteNumber(payload.x, 0, -30_000_000, 30_000_000),
+    y: finiteNumber(payload.y, 0, -2048, 2048),
+    z: finiteNumber(payload.z, 0, -30_000_000, 30_000_000),
+    distance: finiteNumber(payload.distance, 0, 0, 30_000_000),
+    health: finiteNumber(payload.health, 0, 0, 2048),
+    maxHealth: finiteNumber(payload.maxHealth, 0, 0, 2048),
+    ping: finiteInteger(payload.ping, -1, -1, 120_000),
+    gameMode,
+    sightingCount: finiteInteger(payload.sightingCount, 1, 1, 2_147_483_647),
+    totalVisibleMs: finiteInteger(payload.totalVisibleMs, 0, 0, 31_536_000_000),
+    visibleMs: finiteInteger(payload.visibleMs, 0, 0, 31_536_000_000)
+  };
+}
+
+function sanitizeLabel(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const label = value.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  if (!label) return null;
+  return label.slice(0, maxLength);
+}
+
+function finiteNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const number = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function finiteInteger(value: unknown, fallback: number, min: number, max: number): number {
+  return Math.round(finiteNumber(value, fallback, min, max));
 }
 
 function randomChallenge(): string {
@@ -1129,6 +1296,21 @@ const INDEX_HTML = `<!doctype html>
             <div class="metric-note">Chat throughput</div>
           </article>
           <article class="metric">
+            <div class="metric-label">Seen reports</div>
+            <div class="metric-value" id="totalSightings">0</div>
+            <div class="metric-note" id="sightingNote">No sightings yet</div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Seen / hour</div>
+            <div class="metric-value" id="sightingsLastHour">0</div>
+            <div class="metric-note">Tracker throughput</div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Unique seen</div>
+            <div class="metric-value" id="uniqueSeenPlayers">0</div>
+            <div class="metric-note">Shared player graph</div>
+          </article>
+          <article class="metric">
             <div class="metric-label">Dashboard viewers</div>
             <div class="metric-value" id="viewersOnline">0</div>
             <div class="metric-note">Open operator tabs</div>
@@ -1366,6 +1548,9 @@ const INDEX_HTML = `<!doctype html>
       const totalMessages = number(stats.totalMessages, messages.size);
       const messagesLast15m = number(stats.messagesLast15m);
       const messagesLastHour = number(stats.messagesLastHour);
+      const totalSightings = number(stats.totalSightings);
+      const sightingsLastHour = number(stats.sightingsLastHour);
+      const uniqueSeenPlayers = number(stats.uniqueSeenPlayers);
       const joinsLastHour = number(stats.joinsLastHour);
       const viewersOnline = number(stats.viewersOnline);
       const clientsConnected = number(stats.clientsConnected, onlinePlayers);
@@ -1379,12 +1564,16 @@ const INDEX_HTML = `<!doctype html>
       setText("totalMessages", formatNumber(totalMessages));
       setText("messagesLast15m", formatNumber(messagesLast15m));
       setText("messagesLastHour", formatNumber(messagesLastHour));
+      setText("totalSightings", formatNumber(totalSightings));
+      setText("sightingsLastHour", formatNumber(sightingsLastHour));
+      setText("uniqueSeenPlayers", formatNumber(uniqueSeenPlayers));
       setText("joinsLastHour", formatNumber(joinsLastHour));
       setText("viewersOnline", formatNumber(viewersOnline));
       setText("clientsConnected", formatNumber(clientsConnected));
       setText("busiestServer", stats.busiestServer || "None yet");
       setText("onlineNote", onlinePlayers ? onlineServers + " live server" + plural(onlineServers) : "Waiting for verified clients");
       setText("messageNote", stats.latestMessageAt ? "Last message " + relativeTime(stats.latestMessageAt) : "No chat yet");
+      setText("sightingNote", stats.latestSightingAt ? "Last report " + relativeTime(stats.latestSightingAt) : "No sightings yet");
       setText("sessionNote", "Average " + formatMinutes(averageSessionMinutes));
       setText("lastActivity", stats.latestMessageAt ? "Latest chat " + formatTime(stats.latestMessageAt) : "No activity");
       setText("avgSessionValue", formatMinutes(averageSessionMinutes));

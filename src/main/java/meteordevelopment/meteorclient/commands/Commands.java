@@ -11,6 +11,7 @@ import dev.stardust.commands.BlissChatCommand;
 import dev.stardust.commands.DiscordChatCommand;
 import dev.stardust.commands.Life;
 import dev.stardust.commands.Loadout;
+import dev.stardust.commands.StatsCommand;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.commands.commands.*;
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
@@ -77,6 +78,7 @@ public class Commands {
         add(new DiscordChatCommand());
         add(new Loadout());
         add(new Life());
+        add(new StatsCommand());
 
         COMMANDS.sort(Comparator.comparing(Command::getName));
 

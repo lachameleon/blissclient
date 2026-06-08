@@ -581,7 +581,6 @@ public class Modules extends System<Modules> {
         add(new BlissChat());
         add(new BookBot());
         add(new DiscordChatIntegration());
-        add(new DiscordPresence());
         add(new InventoryTweaks());
         add(new Loadouts());
         add(new LoreLocator());
