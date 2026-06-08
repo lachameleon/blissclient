@@ -605,20 +605,21 @@ const INDEX_HTML = `<!doctype html>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #090a0f;
-      --surface: rgba(17, 14, 24, 0.88);
-      --surface-2: rgba(24, 17, 33, 0.88);
-      --surface-3: rgba(31, 24, 41, 0.84);
-      --line: rgba(255, 255, 255, 0.09);
-      --line-strong: rgba(255, 115, 190, 0.28);
-      --pink: #ff73be;
-      --blue: #65d6ff;
-      --green: #73ff73;
+      --bg: #070b12;
+      --surface: rgba(10, 15, 22, 0.9);
+      --surface-2: rgba(13, 19, 27, 0.92);
+      --surface-3: rgba(18, 25, 35, 0.88);
+      --line: rgba(148, 163, 184, 0.16);
+      --line-strong: rgba(99, 215, 255, 0.34);
+      --accent: #63d7ff;
+      --accent-2: #7cf2bd;
+      --blue: #63d7ff;
+      --green: #8af0a4;
       --amber: #ffd36a;
-      --text: #fff6fb;
-      --muted: #bdaec0;
-      --soft: #837489;
-      --shadow: rgba(0, 0, 0, 0.35);
+      --text: #f4f7fb;
+      --muted: #a8b5c6;
+      --soft: #748195;
+      --shadow: rgba(0, 0, 0, 0.42);
     }
 
     * {
@@ -631,12 +632,11 @@ const INDEX_HTML = `<!doctype html>
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at 14% 10%, rgba(255, 115, 190, 0.18), transparent 32%),
-        radial-gradient(circle at 82% 16%, rgba(101, 214, 255, 0.14), transparent 30%),
-        linear-gradient(180deg, rgba(115, 255, 115, 0.04), transparent 44%),
+        radial-gradient(circle at 12% -4%, rgba(99, 215, 255, 0.18), transparent 34%),
+        radial-gradient(circle at 84% 12%, rgba(124, 242, 189, 0.13), transparent 30%),
+        linear-gradient(180deg, rgba(12, 20, 31, 0.92), rgba(7, 11, 18, 0.98) 46%, var(--bg)),
         repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 64px),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 64px),
-        var(--bg);
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 64px);
     }
 
     main {
@@ -658,7 +658,7 @@ const INDEX_HTML = `<!doctype html>
       border: 1px solid var(--line);
       background: var(--surface);
       border-radius: 8px;
-      box-shadow: 0 20px 56px var(--shadow);
+      box-shadow: 0 20px 56px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
       backdrop-filter: blur(18px);
     }
 
@@ -674,7 +674,8 @@ const INDEX_HTML = `<!doctype html>
       justify-content: space-between;
       gap: 18px;
       padding: 16px 18px;
-      background: linear-gradient(90deg, rgba(255, 115, 190, 0.13), rgba(101, 214, 255, 0.07));
+      border-color: var(--line-strong);
+      background: linear-gradient(90deg, rgba(99, 215, 255, 0.12), rgba(124, 242, 189, 0.07)), var(--surface);
     }
 
     .brand {
@@ -685,10 +686,14 @@ const INDEX_HTML = `<!doctype html>
     }
 
     .brand-logo {
-      width: 96px;
+      width: 112px;
       height: auto;
       object-fit: contain;
-      filter: drop-shadow(0 8px 18px rgba(255, 115, 190, 0.22));
+      padding: 6px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 6px;
+      background: rgba(244, 247, 251, 0.94);
+      filter: drop-shadow(0 8px 18px rgba(99, 215, 255, 0.22));
     }
 
     h1,
@@ -758,7 +763,8 @@ const INDEX_HTML = `<!doctype html>
 
     .metric.feature {
       grid-column: span 2;
-      background: linear-gradient(135deg, rgba(255, 115, 190, 0.22), rgba(101, 214, 255, 0.10)), var(--surface);
+      border-color: var(--line-strong);
+      background: linear-gradient(135deg, rgba(99, 215, 255, 0.18), rgba(124, 242, 189, 0.10)), var(--surface);
     }
 
     .metric-label {
@@ -799,7 +805,7 @@ const INDEX_HTML = `<!doctype html>
     }
 
     .metric.chat .metric-value {
-      color: var(--pink);
+      color: var(--accent);
     }
 
     .dashboard-grid {
@@ -836,8 +842,9 @@ const INDEX_HTML = `<!doctype html>
 
     .chip {
       flex: 0 0 auto;
-      color: #0c1112;
-      background: var(--green);
+      color: #dff8ff;
+      border: 1px solid rgba(99, 215, 255, 0.28);
+      background: rgba(99, 215, 255, 0.12);
       border-radius: 999px;
       padding: 5px 8px;
       font-size: 0.75rem;
@@ -882,15 +889,16 @@ const INDEX_HTML = `<!doctype html>
       margin-top: 6px;
       height: 6px;
       border-radius: 8px;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(148, 163, 184, 0.12);
       overflow: hidden;
     }
 
     .server-bar {
       height: 100%;
       width: 0;
-      background: linear-gradient(90deg, var(--pink), var(--blue));
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
       border-radius: inherit;
+      box-shadow: 0 0 14px rgba(99, 215, 255, 0.22);
     }
 
     .server-count {
@@ -918,7 +926,7 @@ const INDEX_HTML = `<!doctype html>
       min-height: 8px;
       height: 8px;
       border-radius: 8px 8px 2px 2px;
-      background: linear-gradient(180deg, var(--green), rgba(101, 214, 255, 0.62));
+      background: linear-gradient(180deg, var(--accent-2), rgba(99, 215, 255, 0.68));
     }
 
     .bar span {
@@ -937,8 +945,8 @@ const INDEX_HTML = `<!doctype html>
 
     .user,
     .message {
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: rgba(7, 12, 19, 0.56);
       border-radius: 8px;
     }
 
@@ -957,7 +965,7 @@ const INDEX_HTML = `<!doctype html>
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      color: var(--pink);
+      color: var(--accent);
       font-weight: 900;
     }
 
@@ -986,7 +994,7 @@ const INDEX_HTML = `<!doctype html>
     .message:hover,
     .user:hover {
       border-color: var(--line-strong);
-      background: rgba(255, 115, 190, 0.08);
+      background: rgba(99, 215, 255, 0.08);
     }
 
     .text {
@@ -1040,7 +1048,7 @@ const INDEX_HTML = `<!doctype html>
       }
 
       .brand-logo {
-        width: 82px;
+        width: 96px;
       }
 
       .metrics,

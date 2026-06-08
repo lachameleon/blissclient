@@ -30,6 +30,7 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class TitleScreenCredits {
     private static final List<Credit> credits = new ArrayList<>();
+    private static final int BLISS_PINK = 0xFFFF73BE;
 
     private TitleScreenCredits() {
     }
@@ -83,8 +84,9 @@ public class TitleScreenCredits {
 
     private static void add(MeteorAddon addon) {
         Credit credit = new Credit(addon);
+        boolean blissClient = addon == MeteorClient.ADDON || "Bliss Client".equals(addon.name);
 
-        credit.text.append(Component.literal(addon.name).withStyle(style -> style.withColor(addon.color.getPacked())));
+        credit.text.append(Component.literal(addon.name).withStyle(style -> style.withColor(blissClient ? BLISS_PINK : addon.color.getPacked())));
         credit.text.append(Component.literal(" by ").withStyle(ChatFormatting.GRAY));
 
         for (int i = 0; i < addon.authors.length; i++) {
@@ -92,7 +94,7 @@ public class TitleScreenCredits {
                 credit.text.append(Component.literal(i == addon.authors.length - 1 ? " & " : ", ").withStyle(ChatFormatting.GRAY));
             }
 
-            credit.text.append(Component.literal(addon.authors[i]).withStyle(ChatFormatting.WHITE));
+            credit.text.append(Component.literal(addon.authors[i]).withStyle(style -> style.withColor(blissClient ? BLISS_PINK : 0xFFFFFFFF)));
         }
 
         credits.add(credit);

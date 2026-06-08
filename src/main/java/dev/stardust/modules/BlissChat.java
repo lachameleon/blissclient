@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.authlib.exceptions.AuthenticationException;
 import dev.stardust.blisschat.BlissChatClient;
-import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
@@ -91,13 +90,19 @@ public class BlissChat extends Module {
     }
 
     @EventHandler
-    private void onJoin(GameJoinedEvent event) {
-        if (autoConnect.get() && isActive()) connect();
-    }
-
-    @EventHandler
     private void onLeave(GameLeftEvent event) {
         disconnect("Left server.");
+    }
+
+    public void connectOnServerJoin() {
+        if (!autoConnect.get()) return;
+
+        mc.execute(() -> {
+            if (!autoConnect.get() || mc.player == null || mc.getCurrentServer() == null) return;
+
+            if (!isActive()) enable();
+            else connect();
+        });
     }
 
     public void sendChat(String message) {
