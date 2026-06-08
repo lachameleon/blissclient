@@ -32,14 +32,13 @@ public class BlissChat extends Module {
     private static final int PINK = 0xFF73BE;
     private static final int HOT_PINK = 0xFF4FA8;
     private static final int BLUE = 0x65D6FF;
-    private static final int PLUM = 0x2A1028;
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
     private final Setting<String> backendUrl = sgGeneral.add(new StringSetting.Builder()
         .name("backend-url")
         .description("Cloudflare Worker WebSocket URL for Bliss chat.")
-        .defaultValue("ws://localhost:8787/chat")
+        .defaultValue("wss://blissclientbackend.hogridersupercell123.workers.dev/chat")
         .onChanged(value -> {
             if (isActive()) reconnect();
         })
@@ -194,9 +193,9 @@ public class BlissChat extends Module {
     public void displayHistory(JsonArray messages) {
         if (!showHistory.get() || messages.isEmpty()) return;
 
-        sendLine(Component.literal("Recent Bliss chat").setStyle(Style.EMPTY
-            .withColor(TextColor.fromRgb(BLUE))
-            .withBold(true)));
+        sendLine(Component.literal("Bliss Chat")
+            .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(PINK)).withBold(true))
+            .append(Component.literal(" recent messages").withStyle(ChatFormatting.GRAY)));
 
         for (JsonElement element : messages) {
             if (element != null && element.isJsonObject()) displayChatMessage(element.getAsJsonObject());
@@ -216,10 +215,10 @@ public class BlissChat extends Module {
             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Playing on: " + serverAddress + "\nUUID: " + uuid)
                 .withStyle(ChatFormatting.GRAY))));
 
-        MutableComponent line = prefix()
+        MutableComponent line = Component.empty()
             .append(name)
-            .append(Component.literal("  ").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(PLUM))))
-            .append(Component.literal(message).withStyle(ChatFormatting.WHITE));
+            .append(Component.literal(": ").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(BLUE))))
+            .append(Component.literal(message).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0xFFF6FB))));
 
         sendRawLine(line);
     }
@@ -299,21 +298,13 @@ public class BlissChat extends Module {
     }
 
     private void sendLine(Component component) {
-        sendRawLine(prefix().append(component));
+        sendRawLine(component);
     }
 
     private void sendRawLine(Component component) {
         mc.execute(() -> {
             if (mc.player != null) mc.player.sendSystemMessage(component);
         });
-    }
-
-    private MutableComponent prefix() {
-        return Component.literal("[")
-            .withStyle(ChatFormatting.DARK_GRAY)
-            .append(Component.literal("Bliss").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(PINK)).withBold(true)))
-            .append(Component.literal("Chat").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(BLUE)).withBold(true)))
-            .append(Component.literal("] ").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static String message(Exception ex) {

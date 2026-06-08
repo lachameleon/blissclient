@@ -9,13 +9,13 @@ npm install
 npm run dev
 ```
 
-The Minecraft client defaults to `ws://localhost:8787/chat`. Deploy with:
+For local backend testing, set the BlissChat module `backend-url` setting to `ws://localhost:8787/chat`. Deploy with:
 
 ```sh
 npm run deploy
 ```
 
-After deployment, set the BlissChat module `backend-url` setting to `wss://<your-worker-host>/chat`.
+The Minecraft client defaults to `wss://blissclientbackend.hogridersupercell123.workers.dev/chat`.
 
 ## Auth model
 
