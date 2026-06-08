@@ -45,6 +45,47 @@ interface ServerMetricRow extends Record<string, SqlStorageValue> {
   sessions: number;
 }
 
+interface TopSeenPlayerRow extends Record<string, SqlStorageValue> {
+  seen_username: string;
+  seen_uuid: string;
+  sightings: number;
+  reporters: number;
+  servers: number;
+  latest_seen: number;
+  avg_distance: number;
+  avg_speed: number;
+  avg_health: number;
+  avg_ping: number | null;
+}
+
+interface RecentSightingRow extends Record<string, SqlStorageValue> {
+  timestamp: number;
+  reporter_username: string;
+  seen_username: string;
+  seen_uuid: string;
+  seen_server_address: string;
+  dimension: string;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+  health: number;
+  max_health: number;
+  ping: number;
+  game_mode: string;
+  speed: number;
+}
+
+interface HeatmapMetricRow extends Record<string, SqlStorageValue> {
+  seen_server_address: string;
+  dimension: string;
+  heatmap_x: number;
+  heatmap_z: number;
+  samples: number;
+  players: number;
+  latest_seen: number;
+}
+
 interface PlayerSighting {
   seenUsername: string;
   seenUuid: string;
@@ -61,6 +102,10 @@ interface PlayerSighting {
   sightingCount: number;
   totalVisibleMs: number;
   visibleMs: number;
+  averageDistance: number;
+  speed: number;
+  heatmapX: number;
+  heatmapZ: number;
 }
 
 interface MojangProfile {
@@ -72,6 +117,7 @@ const MAX_MESSAGE_LENGTH = 240;
 const MESSAGE_COOLDOWN_MS = 750;
 const HISTORY_LIMIT = 75;
 const SIGHTING_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+const HEATMAP_BIN_SIZE = 128;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -154,11 +200,28 @@ export class ChatRoom extends DurableObject<Env> {
         game_mode TEXT NOT NULL,
         sighting_count INTEGER NOT NULL,
         total_visible_ms INTEGER NOT NULL,
-        visible_ms INTEGER NOT NULL
+        visible_ms INTEGER NOT NULL,
+        average_distance REAL NOT NULL DEFAULT 0,
+        speed REAL NOT NULL DEFAULT 0,
+        heatmap_x INTEGER NOT NULL DEFAULT 0,
+        heatmap_z INTEGER NOT NULL DEFAULT 0
       )
     `);
+    this.ensureColumn("player_sightings", "average_distance REAL NOT NULL DEFAULT 0");
+    this.ensureColumn("player_sightings", "speed REAL NOT NULL DEFAULT 0");
+    this.ensureColumn("player_sightings", "heatmap_x INTEGER NOT NULL DEFAULT 0");
+    this.ensureColumn("player_sightings", "heatmap_z INTEGER NOT NULL DEFAULT 0");
     this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_timestamp ON player_sightings (timestamp)");
     this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_seen_uuid ON player_sightings (seen_uuid)");
+    this.ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS idx_player_sightings_heatmap ON player_sightings (seen_server_address, dimension, heatmap_x, heatmap_z)");
+  }
+
+  private ensureColumn(table: string, columnSql: string): void {
+    try {
+      this.ctx.storage.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`);
+    } catch {
+      // Existing Durable Object instances may already have the column.
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -391,8 +454,12 @@ export class ChatRoom extends DurableObject<Env> {
         game_mode,
         sighting_count,
         total_visible_ms,
-        visible_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visible_ms,
+        average_distance,
+        speed,
+        heatmap_x,
+        heatmap_z
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       crypto.randomUUID(),
       timestamp,
       attachment.username,
@@ -412,7 +479,11 @@ export class ChatRoom extends DurableObject<Env> {
       sighting.gameMode,
       sighting.sightingCount,
       sighting.totalVisibleMs,
-      sighting.visibleMs
+      sighting.visibleMs,
+      sighting.averageDistance,
+      sighting.speed,
+      sighting.heatmapX,
+      sighting.heatmapZ
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM player_sightings WHERE timestamp < ?",
@@ -569,7 +640,10 @@ export class ChatRoom extends DurableObject<Env> {
       busiestServer: this.firstString("SELECT server_address AS value FROM sessions GROUP BY server_address ORDER BY COUNT(*) DESC, MAX(connected_at) DESC LIMIT 1"),
       latestMessageAt,
       latestSightingAt,
-      topServers: this.topServers()
+      topServers: this.topServers(),
+      topSeenPlayers: this.topSeenPlayers(),
+      recentSightings: this.recentSightings(),
+      coordinateHeatmap: this.coordinateHeatmap()
     };
   }
 
@@ -613,6 +687,93 @@ export class ChatRoom extends DurableObject<Env> {
       online: onlineCounts.get(row.server_address) ?? 0
     }));
   }
+
+  private topSeenPlayers(): Array<{ username: string; uuid: string; sightings: number; reporters: number; servers: number; latestSeen: number; avgDistance: number; avgSpeed: number; avgHealth: number; avgPing: number }> {
+    const rows = [...this.ctx.storage.sql.exec<TopSeenPlayerRow>(
+      `SELECT
+        seen_username,
+        seen_uuid,
+        COUNT(*) AS sightings,
+        COUNT(DISTINCT reporter_uuid) AS reporters,
+        COUNT(DISTINCT seen_server_address) AS servers,
+        MAX(timestamp) AS latest_seen,
+        AVG(distance) AS avg_distance,
+        AVG(speed) AS avg_speed,
+        AVG(health) AS avg_health,
+        AVG(CASE WHEN ping >= 0 THEN ping END) AS avg_ping
+      FROM player_sightings
+      GROUP BY seen_uuid, seen_username
+      ORDER BY sightings DESC, latest_seen DESC
+      LIMIT 10`
+    )];
+
+    return rows.map(row => ({
+      username: row.seen_username,
+      uuid: row.seen_uuid,
+      sightings: Number(row.sightings ?? 0),
+      reporters: Number(row.reporters ?? 0),
+      servers: Number(row.servers ?? 0),
+      latestSeen: Number(row.latest_seen ?? 0),
+      avgDistance: Number(row.avg_distance ?? 0),
+      avgSpeed: Number(row.avg_speed ?? 0),
+      avgHealth: Number(row.avg_health ?? 0),
+      avgPing: Number(row.avg_ping ?? 0)
+    }));
+  }
+
+  private recentSightings(): Array<{ timestamp: number; reporter: string; username: string; uuid: string; serverAddress: string; dimension: string; x: number; y: number; z: number; distance: number; health: number; maxHealth: number; ping: number; gameMode: string; speed: number }> {
+    const rows = [...this.ctx.storage.sql.exec<RecentSightingRow>(
+      `SELECT timestamp, reporter_username, seen_username, seen_uuid, seen_server_address, dimension, x, y, z, distance, health, max_health, ping, game_mode, speed
+      FROM player_sightings
+      ORDER BY timestamp DESC
+      LIMIT 12`
+    )];
+
+    return rows.map(row => ({
+      timestamp: Number(row.timestamp ?? 0),
+      reporter: row.reporter_username,
+      username: row.seen_username,
+      uuid: row.seen_uuid,
+      serverAddress: row.seen_server_address,
+      dimension: row.dimension,
+      x: Number(row.x ?? 0),
+      y: Number(row.y ?? 0),
+      z: Number(row.z ?? 0),
+      distance: Number(row.distance ?? 0),
+      health: Number(row.health ?? 0),
+      maxHealth: Number(row.max_health ?? 0),
+      ping: Number(row.ping ?? -1),
+      gameMode: row.game_mode,
+      speed: Number(row.speed ?? 0)
+    }));
+  }
+
+  private coordinateHeatmap(): Array<{ serverAddress: string; dimension: string; x: number; z: number; samples: number; players: number; latestSeen: number }> {
+    const rows = [...this.ctx.storage.sql.exec<HeatmapMetricRow>(
+      `SELECT
+        seen_server_address,
+        dimension,
+        heatmap_x,
+        heatmap_z,
+        COUNT(*) AS samples,
+        COUNT(DISTINCT seen_uuid) AS players,
+        MAX(timestamp) AS latest_seen
+      FROM player_sightings
+      GROUP BY seen_server_address, dimension, heatmap_x, heatmap_z
+      ORDER BY samples DESC, latest_seen DESC
+      LIMIT 24`
+    )];
+
+    return rows.map(row => ({
+      serverAddress: row.seen_server_address,
+      dimension: row.dimension,
+      x: Number(row.heatmap_x ?? 0),
+      z: Number(row.heatmap_z ?? 0),
+      samples: Number(row.samples ?? 0),
+      players: Number(row.players ?? 0),
+      latestSeen: Number(row.latest_seen ?? 0)
+    }));
+  }
 }
 
 interface DashboardStats {
@@ -637,6 +798,9 @@ interface DashboardStats {
   latestMessageAt: number;
   latestSightingAt: number;
   topServers: Array<{ serverAddress: string; sessions: number; online: number }>;
+  topSeenPlayers: Array<{ username: string; uuid: string; sightings: number; reporters: number; servers: number; latestSeen: number; avgDistance: number; avgSpeed: number; avgHealth: number; avgPing: number }>;
+  recentSightings: Array<{ timestamp: number; reporter: string; username: string; uuid: string; serverAddress: string; dimension: string; x: number; y: number; z: number; distance: number; health: number; maxHealth: number; ping: number; gameMode: string; speed: number }>;
+  coordinateHeatmap: Array<{ serverAddress: string; dimension: string; x: number; z: number; samples: number; players: number; latestSeen: number }>;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -730,7 +894,11 @@ function sanitizePlayerSighting(payload: JsonObject, fallbackServerAddress: stri
     gameMode,
     sightingCount: finiteInteger(payload.sightingCount, 1, 1, 2_147_483_647),
     totalVisibleMs: finiteInteger(payload.totalVisibleMs, 0, 0, 31_536_000_000),
-    visibleMs: finiteInteger(payload.visibleMs, 0, 0, 31_536_000_000)
+    visibleMs: finiteInteger(payload.visibleMs, 0, 0, 31_536_000_000),
+    averageDistance: finiteNumber(payload.averageDistance, 0, 0, 30_000_000),
+    speed: finiteNumber(payload.speed, 0, 0, 1024),
+    heatmapX: finiteInteger(payload.heatmapX, heatmapBase(finiteNumber(payload.x, 0, -30_000_000, 30_000_000)), -30_000_000, 30_000_000),
+    heatmapZ: finiteInteger(payload.heatmapZ, heatmapBase(finiteNumber(payload.z, 0, -30_000_000, 30_000_000)), -30_000_000, 30_000_000)
   };
 }
 
@@ -748,6 +916,10 @@ function finiteNumber(value: unknown, fallback: number, min: number, max: number
 
 function finiteInteger(value: unknown, fallback: number, min: number, max: number): number {
   return Math.round(finiteNumber(value, fallback, min, max));
+}
+
+function heatmapBase(coordinate: number): number {
+  return Math.floor(coordinate / HEATMAP_BIN_SIZE) * HEATMAP_BIN_SIZE;
 }
 
 function randomChallenge(): string {
@@ -1020,6 +1192,8 @@ const INDEX_HTML = `<!doctype html>
 
     .server-list,
     .activity-list,
+    .intel-list,
+    .sighting-list,
     .users,
     .messages {
       display: grid;
@@ -1103,6 +1277,46 @@ const INDEX_HTML = `<!doctype html>
       white-space: nowrap;
     }
 
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .heatmap-grid .empty {
+      grid-column: 1 / -1;
+    }
+
+    .heat-cell {
+      min-height: 72px;
+      padding: 9px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 8px;
+      background: rgba(99, 215, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .heat-cell strong,
+    .sighting-main {
+      display: block;
+      color: var(--text);
+      font-size: 0.83rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .heat-cell span,
+    .sighting-meta {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .side {
       display: grid;
       gap: 14px;
@@ -1159,7 +1373,8 @@ const INDEX_HTML = `<!doctype html>
     }
 
     .message:hover,
-    .user:hover {
+    .user:hover,
+    .heat-cell:hover {
       border-color: var(--line-strong);
       background: rgba(99, 215, 255, 0.08);
     }
@@ -1366,6 +1581,32 @@ const INDEX_HTML = `<!doctype html>
             </div>
             <div class="activity-list" id="activity"></div>
           </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Player Intel</h2>
+                <p class="panel-sub">Most reported players across verified tracker uploads.</p>
+              </div>
+              <span class="chip" id="intelChip">0 players</span>
+            </div>
+            <div class="intel-list" id="topSeen">
+              <div class="empty">No seen player reports yet.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Coordinate Heatmap</h2>
+                <p class="panel-sub">Hot coordinate bins from shared sightings.</p>
+              </div>
+              <span class="chip" id="heatmapChip">0 cells</span>
+            </div>
+            <div class="heatmap-grid" id="heatmap">
+              <div class="empty">No coordinate samples yet.</div>
+            </div>
+          </article>
         </section>
 
         <article class="panel">
@@ -1429,6 +1670,18 @@ const INDEX_HTML = `<!doctype html>
             </div>
           </div>
         </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Recent Sightings</h2>
+              <p class="panel-sub">Latest shared player tracker reports.</p>
+            </div>
+          </div>
+          <div class="sighting-list" id="recentSightings">
+            <div class="empty">No sightings uploaded yet.</div>
+          </div>
+        </article>
       </aside>
     </section>
   </main>
@@ -1437,6 +1690,9 @@ const INDEX_HTML = `<!doctype html>
     const usersEl = document.getElementById("users");
     const serversEl = document.getElementById("servers");
     const activityEl = document.getElementById("activity");
+    const topSeenEl = document.getElementById("topSeen");
+    const heatmapEl = document.getElementById("heatmap");
+    const recentSightingsEl = document.getElementById("recentSightings");
     const statusEl = document.getElementById("status");
     const statusText = document.getElementById("statusText");
     const generatedAtEl = document.getElementById("generatedAt");
@@ -1584,6 +1840,9 @@ const INDEX_HTML = `<!doctype html>
       if (generatedAtEl) generatedAtEl.textContent = stats.generatedAt ? "Updated " + formatTime(stats.generatedAt) : "Metrics pending";
 
       renderServers(stats.topServers || []);
+      renderTopSeen(stats.topSeenPlayers || []);
+      renderHeatmap(stats.coordinateHeatmap || []);
+      renderRecentSightings(stats.recentSightings || []);
       renderSnapshot(stats);
       renderActivity();
     }
@@ -1623,6 +1882,102 @@ const INDEX_HTML = `<!doctype html>
         if (number(server.online)) count.textContent += " / " + server.online + " live";
         row.append(main, count);
         serversEl.append(row);
+      }
+    }
+
+    function renderTopSeen(players) {
+      topSeenEl.replaceChildren();
+      setText("intelChip", players.length + " player" + plural(players.length));
+      if (!players.length) {
+        topSeenEl.append(emptyNode("No seen player reports yet."));
+        return;
+      }
+
+      for (const player of players) {
+        const row = document.createElement("div");
+        row.className = "server-row";
+        row.title = player.uuid || "";
+
+        const main = document.createElement("div");
+        main.className = "server-main";
+        const name = document.createElement("div");
+        name.className = "server-name";
+        name.textContent = player.username || "Unknown";
+        const meta = document.createElement("div");
+        meta.className = "time";
+        meta.textContent = [
+          formatNumber(number(player.reporters)) + " reporters",
+          formatNumber(number(player.servers)) + " servers",
+          "avg " + formatDecimal(player.avgDistance) + " blocks",
+          "last " + relativeTime(player.latestSeen)
+        ].join(" | ");
+        main.append(name, meta);
+
+        const count = document.createElement("div");
+        count.className = "server-count";
+        count.textContent = formatNumber(number(player.sightings)) + " seen";
+        row.append(main, count);
+        topSeenEl.append(row);
+      }
+    }
+
+    function renderHeatmap(cells) {
+      heatmapEl.replaceChildren();
+      setText("heatmapChip", cells.length + " cell" + plural(cells.length));
+      if (!cells.length) {
+        heatmapEl.append(emptyNode("No coordinate samples yet."));
+        return;
+      }
+
+      const max = Math.max(1, ...cells.map(cell => number(cell.samples)));
+      for (const cell of cells.slice(0, 24)) {
+        const item = document.createElement("div");
+        item.className = "heat-cell";
+        const intensity = number(cell.samples) / max;
+        item.style.background = \`linear-gradient(180deg, rgba(255, 99, 178, \${0.14 + intensity * 0.46}), rgba(99, 215, 255, \${0.08 + intensity * 0.24}))\`;
+        item.title = (cell.serverAddress || "unknown") + " / " + (cell.dimension || "unknown");
+
+        const position = document.createElement("strong");
+        position.textContent = formatCoord(cell.x, cell.z);
+        const samples = document.createElement("span");
+        samples.textContent = formatNumber(number(cell.samples)) + " samples | " + formatNumber(number(cell.players)) + " players";
+        const server = document.createElement("span");
+        server.textContent = cell.serverAddress || "unknown";
+        item.append(position, samples, server);
+        heatmapEl.append(item);
+      }
+    }
+
+    function renderRecentSightings(sightings) {
+      recentSightingsEl.replaceChildren();
+      if (!sightings.length) {
+        recentSightingsEl.append(emptyNode("No sightings uploaded yet."));
+        return;
+      }
+
+      for (const sighting of sightings) {
+        const row = document.createElement("div");
+        row.className = "user";
+        row.title = [
+          "Reporter: " + (sighting.reporter || "unknown"),
+          "Server: " + (sighting.serverAddress || "unknown"),
+          "Dimension: " + (sighting.dimension || "unknown")
+        ].join("\\n");
+
+        const main = document.createElement("div");
+        const title = document.createElement("span");
+        title.className = "sighting-main";
+        title.textContent = sighting.username || "Unknown";
+        const meta = document.createElement("span");
+        meta.className = "sighting-meta";
+        meta.textContent = formatCoord(sighting.x, sighting.z) + " | " + formatDecimal(sighting.distance) + " blocks | " + relativeTime(sighting.timestamp);
+        main.append(title, meta);
+
+        const health = document.createElement("span");
+        health.className = "server";
+        health.textContent = formatDecimal(sighting.health) + "/" + formatDecimal(sighting.maxHealth);
+        row.append(main, health);
+        recentSightingsEl.append(row);
       }
     }
 
@@ -1704,6 +2059,21 @@ const INDEX_HTML = `<!doctype html>
     function setBar(id, value) {
       const element = document.getElementById(id);
       if (element) element.style.width = Math.max(0, Math.min(100, value)) + "%";
+    }
+
+    function emptyNode(text) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = text;
+      return empty;
+    }
+
+    function formatCoord(x, z) {
+      return Math.round(number(x)) + ", " + Math.round(number(z));
+    }
+
+    function formatDecimal(value) {
+      return number(value).toFixed(1);
     }
 
     function number(value, fallback = 0) {

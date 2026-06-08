@@ -15,6 +15,10 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.player.Player;
 
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,6 +36,8 @@ public class PlayerTracker extends System<PlayerTracker> {
     private static final long MAX_TICK_DELTA_MS = 2500;
     private static final long AUTOSAVE_INTERVAL_MS = 60000;
     private static final long BACKEND_REPORT_INTERVAL_MS = 15000;
+    private static final long HEATMAP_SAMPLE_INTERVAL_MS = 2000;
+    public static final int HEATMAP_BIN_SIZE = 128;
 
     private final Map<UUID, PlayerStats> players = new HashMap<>();
     private final Map<String, UUID> names = new HashMap<>();
@@ -86,6 +92,8 @@ public class PlayerTracker extends System<PlayerTracker> {
                 stats.sightingCount++;
                 increment(stats.serverSightings, server);
                 increment(stats.dimensionSightings, dimension);
+                increment(stats.hourSightings, hourKey(now));
+                increment(stats.daySightings, dayKey(now));
             }
 
             sample(stats, active, player, server, dimension, now);
@@ -124,6 +132,17 @@ public class PlayerTracker extends System<PlayerTracker> {
             .sorted(Comparator.comparingLong((PlayerStats stats) -> stats.totalVisibleMs).reversed())
             .limit(limit)
             .toList();
+    }
+
+    public List<HeatmapCell> getHeatmap(int limit) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (PlayerStats stats : players.values()) {
+            for (Map.Entry<String, Integer> entry : stats.coordinateHeatmap.entrySet()) {
+                counts.merge(entry.getKey(), entry.getValue(), Integer::sum);
+            }
+        }
+
+        return heatmapCells(counts, limit);
     }
 
     public int count() {
@@ -196,11 +215,53 @@ public class PlayerTracker extends System<PlayerTracker> {
         stats.lastX = player.getX();
         stats.lastY = player.getY();
         stats.lastZ = player.getZ();
+        if (stats.coordinateSamples == 0) {
+            stats.firstX = stats.lastX;
+            stats.firstY = stats.lastY;
+            stats.firstZ = stats.lastZ;
+            stats.minX = stats.maxX = stats.lastX;
+            stats.minY = stats.maxY = stats.lastY;
+            stats.minZ = stats.maxZ = stats.lastZ;
+        } else {
+            stats.minX = Math.min(stats.minX, stats.lastX);
+            stats.maxX = Math.max(stats.maxX, stats.lastX);
+            stats.minY = Math.min(stats.minY, stats.lastY);
+            stats.maxY = Math.max(stats.maxY, stats.lastY);
+            stats.minZ = Math.min(stats.minZ, stats.lastZ);
+            stats.maxZ = Math.max(stats.maxZ, stats.lastZ);
+        }
+        stats.totalY += stats.lastY;
+        stats.coordinateSamples++;
+
+        if (active.hasPosition && delta > 0) {
+            double moved = distance(active.lastX, active.lastY, active.lastZ, stats.lastX, stats.lastY, stats.lastZ);
+            if (moved <= 1024) {
+                double speed = moved * 1000.0 / delta;
+                stats.lastSpeed = speed;
+                stats.maxSpeed = Math.max(stats.maxSpeed, speed);
+                stats.totalTravelDistance += moved;
+                stats.speedSamples++;
+            }
+        }
+        active.lastX = stats.lastX;
+        active.lastY = stats.lastY;
+        active.lastZ = stats.lastZ;
+        active.hasPosition = true;
 
         double distance = player.distanceTo(mc.player);
         stats.lastDistance = distance;
-        stats.minDistance = Math.min(stats.minDistance, distance);
-        stats.maxDistance = Math.max(stats.maxDistance, distance);
+        if (distance < stats.minDistance) {
+            stats.minDistance = distance;
+            stats.closestX = stats.lastX;
+            stats.closestY = stats.lastY;
+            stats.closestZ = stats.lastZ;
+        }
+        if (distance > stats.maxDistance) {
+            stats.maxDistance = distance;
+            stats.farthestX = stats.lastX;
+            stats.farthestY = stats.lastY;
+            stats.farthestZ = stats.lastZ;
+        }
         stats.totalDistance += distance;
         stats.distanceSamples++;
 
@@ -209,23 +270,52 @@ public class PlayerTracker extends System<PlayerTracker> {
         stats.lastMaxHealth = player.getMaxHealth();
         stats.minHealth = Math.min(stats.minHealth, health);
         stats.maxHealth = Math.max(stats.maxHealth, health);
+        stats.totalHealth += health;
         stats.healthSamples++;
 
         PlayerInfo info = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(player.getUUID());
         if (info != null) {
             stats.lastPing = info.getLatency();
-            if (info.getGameMode() != null) stats.lastGameMode = info.getGameMode().getName();
+            stats.minPing = stats.minPing < 0 ? stats.lastPing : Math.min(stats.minPing, stats.lastPing);
+            stats.maxPing = Math.max(stats.maxPing, stats.lastPing);
+            stats.totalPing += stats.lastPing;
+            stats.pingSamples++;
+            if (info.getGameMode() != null) {
+                stats.lastGameMode = info.getGameMode().getName();
+                increment(stats.gameModeSamples, stats.lastGameMode);
+            }
+        }
+
+        if (active.lastHeatmapSample == 0 || now - active.lastHeatmapSample >= HEATMAP_SAMPLE_INTERVAL_MS) {
+            increment(stats.coordinateHeatmap, heatmapKey(dimension, stats.lastX, stats.lastZ));
+            active.lastHeatmapSample = now;
+            stats.heatmapSamples++;
         }
 
         reportSighting(stats, active, server, dimension, now);
     }
 
     private void closeMissingSightings(Set<UUID> visible) {
-        activeSightings.entrySet().removeIf(entry -> !visible.contains(entry.getKey()));
+        activeSightings.entrySet().removeIf(entry -> {
+            if (visible.contains(entry.getKey())) return false;
+            finishSighting(players.get(entry.getKey()), entry.getValue());
+            return true;
+        });
     }
 
     private void closeAllSightings() {
+        for (Map.Entry<UUID, ActiveSighting> entry : activeSightings.entrySet()) {
+            finishSighting(players.get(entry.getKey()), entry.getValue());
+        }
         activeSightings.clear();
+    }
+
+    private void finishSighting(PlayerStats stats, ActiveSighting active) {
+        if (stats == null || active == null || active.durationMs <= 0) return;
+        stats.completedSightings++;
+        stats.lastSightingMs = active.durationMs;
+        stats.shortestSightingMs = Math.min(stats.shortestSightingMs, active.durationMs);
+        stats.longestSightingMs = Math.max(stats.longestSightingMs, active.durationMs);
     }
 
     private void index(PlayerStats stats) {
@@ -239,6 +329,16 @@ public class PlayerTracker extends System<PlayerTracker> {
 
     private static void increment(Map<String, Integer> map, String key) {
         map.merge(key, 1, Integer::sum);
+    }
+
+    private static String hourKey(long timestamp) {
+        int hour = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).getHour();
+        return "%02d:00".formatted(hour);
+    }
+
+    private static String dayKey(long timestamp) {
+        DayOfWeek day = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).getDayOfWeek();
+        return day.getDisplayName(TextStyle.SHORT, Locale.ROOT);
     }
 
     private static String getServerName() {
@@ -278,8 +378,45 @@ public class PlayerTracker extends System<PlayerTracker> {
             stats.sightingCount,
             stats.totalVisibleMs,
             active.durationMs,
+            stats.averageDistance(),
+            stats.lastSpeed,
+            heatmapBase(stats.lastX),
+            heatmapBase(stats.lastZ),
             now
         ));
+    }
+
+    private static double distance(double x1, double y1, double z1, double x2, double y2, double z2) {
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        double dz = z1 - z2;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private static int heatmapBase(double coordinate) {
+        return (int) Math.floor(coordinate / HEATMAP_BIN_SIZE) * HEATMAP_BIN_SIZE;
+    }
+
+    private static String heatmapKey(String dimension, double x, double z) {
+        return "%s|%d|%d".formatted(dimension, heatmapBase(x), heatmapBase(z));
+    }
+
+    private static HeatmapCell heatmapCell(String key, int count) {
+        String[] parts = key.split("\\|");
+        if (parts.length < 3) return new HeatmapCell("unknown", 0, 0, count);
+        try {
+            return new HeatmapCell(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), count);
+        } catch (NumberFormatException ignored) {
+            return new HeatmapCell("unknown", 0, 0, count);
+        }
+    }
+
+    private static List<HeatmapCell> heatmapCells(Map<String, Integer> counts, int limit) {
+        return counts.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .limit(limit)
+            .map(entry -> heatmapCell(entry.getKey(), entry.getValue()))
+            .toList();
     }
 
     private static ListTag namesToTag(List<String> names) {
@@ -336,6 +473,11 @@ public class PlayerTracker extends System<PlayerTracker> {
         private long lastSample;
         private long durationMs;
         private long lastReport;
+        private long lastHeatmapSample;
+        private boolean hasPosition;
+        private double lastX;
+        private double lastY;
+        private double lastZ;
 
         private ActiveSighting(long now) {
             this.lastSample = now;
@@ -358,8 +500,22 @@ public class PlayerTracker extends System<PlayerTracker> {
         int sightingCount,
         long totalVisibleMs,
         long visibleMs,
+        double averageDistance,
+        double speed,
+        int heatmapX,
+        int heatmapZ,
         long timestamp
     ) {
+    }
+
+    public record HeatmapCell(String dimension, int x, int z, int count) {
+        public int centerX() {
+            return x + HEATMAP_BIN_SIZE / 2;
+        }
+
+        public int centerZ() {
+            return z + HEATMAP_BIN_SIZE / 2;
+        }
     }
 
     public static class PlayerStats {
@@ -385,11 +541,45 @@ public class PlayerTracker extends System<PlayerTracker> {
         public String lastGameMode = "unknown";
         public String lastServer = "unknown";
         public String lastDimension = "unknown";
+        public double firstX;
+        public double firstY;
+        public double firstZ;
         public double lastX;
         public double lastY;
         public double lastZ;
+        public double minX;
+        public double maxX;
+        public double minY;
+        public double maxY;
+        public double minZ;
+        public double maxZ;
+        public double closestX;
+        public double closestY;
+        public double closestZ;
+        public double farthestX;
+        public double farthestY;
+        public double farthestZ;
+        public double totalY;
+        public long coordinateSamples;
+        public double totalTravelDistance;
+        public double lastSpeed;
+        public double maxSpeed;
+        public long speedSamples;
+        public double totalHealth;
+        public int minPing = -1;
+        public int maxPing = -1;
+        public long totalPing;
+        public long pingSamples;
+        public long lastSightingMs;
+        public long shortestSightingMs = Long.MAX_VALUE;
+        public int completedSightings;
+        public long heatmapSamples;
         public Map<String, Integer> serverSightings = new LinkedHashMap<>();
         public Map<String, Integer> dimensionSightings = new LinkedHashMap<>();
+        public Map<String, Integer> gameModeSamples = new LinkedHashMap<>();
+        public Map<String, Integer> hourSightings = new LinkedHashMap<>();
+        public Map<String, Integer> daySightings = new LinkedHashMap<>();
+        public Map<String, Integer> coordinateHeatmap = new LinkedHashMap<>();
 
         private PlayerStats(UUID uuid, String name, long now) {
             this.uuid = uuid;
@@ -402,12 +592,53 @@ public class PlayerTracker extends System<PlayerTracker> {
             return distanceSamples == 0 ? 0 : totalDistance / distanceSamples;
         }
 
+        public double averageHealth() {
+            return healthSamples == 0 ? 0 : totalHealth / healthSamples;
+        }
+
+        public double averagePing() {
+            return pingSamples == 0 ? 0 : (double) totalPing / pingSamples;
+        }
+
+        public double averageY() {
+            return coordinateSamples == 0 ? 0 : totalY / coordinateSamples;
+        }
+
+        public double averageSpeed() {
+            if (totalVisibleMs <= 0) return 0;
+            return totalTravelDistance / (totalVisibleMs / 1000.0);
+        }
+
+        public long averageSightingMs() {
+            return sightingCount == 0 ? 0 : totalVisibleMs / sightingCount;
+        }
+
+        public long shortestSightingMs() {
+            return shortestSightingMs == Long.MAX_VALUE ? 0 : shortestSightingMs;
+        }
+
+        public List<HeatmapCell> topHeatmap(int limit) {
+            return heatmapCells(coordinateHeatmap, limit);
+        }
+
         public String topServer() {
             return topKey(serverSightings);
         }
 
         public String topDimension() {
             return topKey(dimensionSightings);
+        }
+
+        public String topGameMode() {
+            return topKey(gameModeSamples);
+        }
+
+        public String topHour() {
+            return topKey(hourSightings);
+        }
+
+        public String topDay() {
+            return topKey(daySightings);
         }
 
         public void updateName(String name) {
@@ -441,11 +672,45 @@ public class PlayerTracker extends System<PlayerTracker> {
             tag.putString("lastGameMode", lastGameMode);
             tag.putString("lastServer", lastServer);
             tag.putString("lastDimension", lastDimension);
+            tag.putDouble("firstX", firstX);
+            tag.putDouble("firstY", firstY);
+            tag.putDouble("firstZ", firstZ);
             tag.putDouble("lastX", lastX);
             tag.putDouble("lastY", lastY);
             tag.putDouble("lastZ", lastZ);
+            tag.putDouble("minX", minX);
+            tag.putDouble("maxX", maxX);
+            tag.putDouble("minY", minY);
+            tag.putDouble("maxY", maxY);
+            tag.putDouble("minZ", minZ);
+            tag.putDouble("maxZ", maxZ);
+            tag.putDouble("closestX", closestX);
+            tag.putDouble("closestY", closestY);
+            tag.putDouble("closestZ", closestZ);
+            tag.putDouble("farthestX", farthestX);
+            tag.putDouble("farthestY", farthestY);
+            tag.putDouble("farthestZ", farthestZ);
+            tag.putDouble("totalY", totalY);
+            tag.putLong("coordinateSamples", coordinateSamples);
+            tag.putDouble("totalTravelDistance", totalTravelDistance);
+            tag.putDouble("lastSpeed", lastSpeed);
+            tag.putDouble("maxSpeed", maxSpeed);
+            tag.putLong("speedSamples", speedSamples);
+            tag.putDouble("totalHealth", totalHealth);
+            tag.putInt("minPing", minPing);
+            tag.putInt("maxPing", maxPing);
+            tag.putLong("totalPing", totalPing);
+            tag.putLong("pingSamples", pingSamples);
+            tag.putLong("lastSightingMs", lastSightingMs);
+            tag.putLong("shortestSightingMs", shortestSightingMs);
+            tag.putInt("completedSightings", completedSightings);
+            tag.putLong("heatmapSamples", heatmapSamples);
             tag.put("serverSightings", countsToTag(serverSightings));
             tag.put("dimensionSightings", countsToTag(dimensionSightings));
+            tag.put("gameModeSamples", countsToTag(gameModeSamples));
+            tag.put("hourSightings", countsToTag(hourSightings));
+            tag.put("daySightings", countsToTag(daySightings));
+            tag.put("coordinateHeatmap", countsToTag(coordinateHeatmap));
 
             return tag;
         }
@@ -481,11 +746,45 @@ public class PlayerTracker extends System<PlayerTracker> {
             stats.lastGameMode = tag.getStringOr("lastGameMode", "unknown");
             stats.lastServer = tag.getStringOr("lastServer", "unknown");
             stats.lastDimension = tag.getStringOr("lastDimension", "unknown");
+            stats.firstX = tag.getDoubleOr("firstX", 0);
+            stats.firstY = tag.getDoubleOr("firstY", 0);
+            stats.firstZ = tag.getDoubleOr("firstZ", 0);
             stats.lastX = tag.getDoubleOr("lastX", 0);
             stats.lastY = tag.getDoubleOr("lastY", 0);
             stats.lastZ = tag.getDoubleOr("lastZ", 0);
+            stats.minX = tag.getDoubleOr("minX", Math.min(0, stats.lastX));
+            stats.maxX = tag.getDoubleOr("maxX", Math.max(0, stats.lastX));
+            stats.minY = tag.getDoubleOr("minY", Math.min(0, stats.lastY));
+            stats.maxY = tag.getDoubleOr("maxY", Math.max(0, stats.lastY));
+            stats.minZ = tag.getDoubleOr("minZ", Math.min(0, stats.lastZ));
+            stats.maxZ = tag.getDoubleOr("maxZ", Math.max(0, stats.lastZ));
+            stats.closestX = tag.getDoubleOr("closestX", stats.lastX);
+            stats.closestY = tag.getDoubleOr("closestY", stats.lastY);
+            stats.closestZ = tag.getDoubleOr("closestZ", stats.lastZ);
+            stats.farthestX = tag.getDoubleOr("farthestX", stats.lastX);
+            stats.farthestY = tag.getDoubleOr("farthestY", stats.lastY);
+            stats.farthestZ = tag.getDoubleOr("farthestZ", stats.lastZ);
+            stats.totalY = tag.getDoubleOr("totalY", 0);
+            stats.coordinateSamples = tag.getLongOr("coordinateSamples", 0);
+            stats.totalTravelDistance = tag.getDoubleOr("totalTravelDistance", 0);
+            stats.lastSpeed = tag.getDoubleOr("lastSpeed", 0);
+            stats.maxSpeed = tag.getDoubleOr("maxSpeed", 0);
+            stats.speedSamples = tag.getLongOr("speedSamples", 0);
+            stats.totalHealth = tag.getDoubleOr("totalHealth", 0);
+            stats.minPing = tag.getIntOr("minPing", -1);
+            stats.maxPing = tag.getIntOr("maxPing", -1);
+            stats.totalPing = tag.getLongOr("totalPing", 0);
+            stats.pingSamples = tag.getLongOr("pingSamples", 0);
+            stats.lastSightingMs = tag.getLongOr("lastSightingMs", 0);
+            stats.shortestSightingMs = tag.getLongOr("shortestSightingMs", Long.MAX_VALUE);
+            stats.completedSightings = tag.getIntOr("completedSightings", 0);
+            stats.heatmapSamples = tag.getLongOr("heatmapSamples", 0);
             stats.serverSightings = countsFromTag(tag, "serverSightings");
             stats.dimensionSightings = countsFromTag(tag, "dimensionSightings");
+            stats.gameModeSamples = countsFromTag(tag, "gameModeSamples");
+            stats.hourSightings = countsFromTag(tag, "hourSightings");
+            stats.daySightings = countsFromTag(tag, "daySightings");
+            stats.coordinateHeatmap = countsFromTag(tag, "coordinateHeatmap");
 
             return stats;
         }

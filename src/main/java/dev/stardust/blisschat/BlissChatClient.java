@@ -123,6 +123,10 @@ public class BlissChatClient extends WebSocketClient {
         json.addProperty("sightingCount", report.sightingCount());
         json.addProperty("totalVisibleMs", report.totalVisibleMs());
         json.addProperty("visibleMs", report.visibleMs());
+        json.addProperty("averageDistance", report.averageDistance());
+        json.addProperty("speed", report.speed());
+        json.addProperty("heatmapX", report.heatmapX());
+        json.addProperty("heatmapZ", report.heatmapZ());
         json.addProperty("timestamp", report.timestamp());
 
         if (!ready || !isOpen()) {
