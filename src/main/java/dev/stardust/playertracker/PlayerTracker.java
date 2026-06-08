@@ -41,7 +41,6 @@ public class PlayerTracker extends System<PlayerTracker> {
 
     public PlayerTracker() {
         super("player-tracker");
-        PlayerStatsPopup.init();
     }
 
     public static PlayerTracker get() {
