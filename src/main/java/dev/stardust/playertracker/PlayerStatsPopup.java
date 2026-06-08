@@ -2,8 +2,11 @@ package dev.stardust.playertracker;
 
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.render.Render2DEvent;
+import meteordevelopment.meteorclient.systems.hud.HudRenderer;
+import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screens.ChatScreen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,15 +29,19 @@ public class PlayerStatsPopup {
     private PlayerStatsPopup() {
     }
 
+    public static void init() {
+        if (!subscribed) {
+            MeteorClient.EVENT_BUS.subscribe(PlayerStatsPopup.class);
+            subscribed = true;
+        }
+    }
+
     public static void show(String title, List<String> lines) {
         show(title, lines, 0xFFFF79C6);
     }
 
     public static void show(String title, List<String> lines, int accent) {
-        if (!subscribed) {
-            MeteorClient.EVENT_BUS.subscribe(PlayerStatsPopup.class);
-            subscribed = true;
-        }
+        init();
 
         popup = new Popup(
             title == null || title.isBlank() ? "Player Stats" : title,
@@ -42,6 +49,10 @@ public class PlayerStatsPopup {
             accent,
             java.lang.System.currentTimeMillis()
         );
+
+        mc.execute(() -> {
+            if (mc.screen instanceof ChatScreen) mc.setScreen(null);
+        });
     }
 
     @EventHandler
@@ -56,27 +67,32 @@ public class PlayerStatsPopup {
         }
 
         double opacity = opacity(age);
-        int maxWidth = Math.min(320, Math.max(220, event.screenWidth - 24));
+        HudRenderer renderer = HudRenderer.INSTANCE;
+        int screenWidth = Utils.getWindowWidth();
+        int maxWidth = Math.min(640, Math.max(360, screenWidth - 48));
         int contentWidth = maxWidth - 24;
-        int lineHeight = 12;
+        int lineHeight = 24;
         int height = 40 + popup.lines.size() * lineHeight + 10;
-        int x = event.screenWidth - maxWidth - 12;
-        int y = 18;
+        int x = screenWidth - maxWidth - 24;
+        int y = 36;
 
-        event.graphics.fill(x + 4, y + 5, x + maxWidth + 4, y + height + 5, color(0x66000000, opacity));
-        event.graphics.fill(x, y, x + maxWidth, y + height, color(BACKGROUND, opacity));
-        event.graphics.fill(x + 1, y + 1, x + maxWidth - 1, y + height - 1, color(PANEL, opacity));
-        event.graphics.fill(x, y, x + maxWidth, y + 2, color(0xFF000000 | popup.accent, opacity));
-        event.graphics.fill(x, y + 2, x + 2, y + height, color(0xFF000000 | popup.accent, opacity * 0.72));
-        event.graphics.fill(x + 12, y + 29, x + maxWidth - 12, y + 30, color(LINE, opacity));
+        renderer.begin(event.graphics);
+        renderer.quad(x + 8, y + 10, maxWidth, height, color(0x66000000, opacity));
+        renderer.quad(x, y, maxWidth, height, color(BACKGROUND, opacity));
+        renderer.quad(x + 2, y + 2, maxWidth - 4, height - 4, color(PANEL, opacity));
+        renderer.quad(x, y, maxWidth, 4, color(0xFF000000 | popup.accent, opacity));
+        renderer.quad(x, y + 4, 4, height - 4, color(0xFF000000 | popup.accent, opacity * 0.72));
+        renderer.quad(x + 12, y + 31, maxWidth - 24, 1, color(LINE, opacity));
 
-        event.graphics.text(mc.font, Component.literal(clip(popup.title, contentWidth)), x + 12, y + 10, color(0xFF000000 | popup.accent, opacity), false);
+        renderer.text(clip(renderer, popup.title, contentWidth), x + 12, y + 10, color(0xFF000000 | popup.accent, opacity), true, 1);
 
-        int textY = y + 38;
+        int textY = y + 42;
         for (int i = 0; i < popup.lines.size(); i++) {
             int textColor = i == 0 ? TEXT : (popup.lines.get(i).startsWith("  ") ? MUTED : TEXT);
-            event.graphics.text(mc.font, Component.literal(clip(popup.lines.get(i), contentWidth)), x + 12, textY + i * lineHeight, color(textColor, opacity), false);
+            renderer.text(clip(renderer, popup.lines.get(i), contentWidth), x + 12, textY + i * lineHeight, color(textColor, opacity), true, 1);
         }
+
+        renderer.end();
     }
 
     private static List<String> limit(List<String> lines) {
@@ -90,11 +106,11 @@ public class PlayerStatsPopup {
         return limited;
     }
 
-    private static String clip(String text, int width) {
-        if (mc.font.width(text) <= width) return text;
+    private static String clip(HudRenderer renderer, String text, int width) {
+        if (renderer.textWidth(text, true, 1) <= width) return text;
 
         String clipped = text;
-        while (clipped.length() > 1 && mc.font.width(clipped + "...") > width) {
+        while (clipped.length() > 1 && renderer.textWidth(clipped + "...", true, 1) > width) {
             clipped = clipped.substring(0, clipped.length() - 1);
         }
         return clipped + "...";
@@ -107,9 +123,9 @@ public class PlayerStatsPopup {
         return 1;
     }
 
-    private static int color(int argb, double opacity) {
+    private static Color color(int argb, double opacity) {
         int alpha = (int) (((argb >>> 24) & 0xFF) * Math.max(0, Math.min(1, opacity)));
-        return (argb & 0x00FFFFFF) | (alpha << 24);
+        return new Color((argb & 0x00FFFFFF) | (alpha << 24));
     }
 
     private record Popup(String title, List<String> lines, int accent, long createdAt) {
