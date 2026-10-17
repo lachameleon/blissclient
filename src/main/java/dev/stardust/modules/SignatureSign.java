@@ -21,11 +21,12 @@ import net.minecraft.world.item.DyeItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.SignItem;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.tags.ItemTags;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import java.util.stream.Stream;
 import dev.stardust.util.MsgUtil;
@@ -444,20 +445,22 @@ public class SignatureSign extends Module {
 
 
     // See AbstractSignEditScreenMixin.java
-    public SignText getSignature(SignBlockEntity sign) {
-        Component[] signature = new Component[4];
+    public List<String> getSignature(SignBlockEntity sign) {
         List<String> lines = getSignText();
-        for (int i = 0; i < lines.size(); i++) {
-            signature[i] = Component.nullToEmpty(lines.get(i));
+        List<String> signature = new ArrayList<>(4);
+        for (int i = 0; i < 4; i++) {
+            String line = i < lines.size() ? lines.get(i) : null;
+            signature.add(line == null ? "" : line);
         }
 
+        SignText frontText = sign.getText(SignTextSlot.FRONT);
         if (protectSigns.get() && !sign.isWaxed()) {
             signsToWax.add(sign);
         }
-        if (signColor.get() != sign.getFrontText().getColor()) signsToColor.add(sign);
-        if (glowSigns.get() && !sign.getFrontText().hasGlowingText()) signsToGlowInk.add(sign);
+        if (signColor.get() != frontText.getColor()) signsToColor.add(sign);
+        if (glowSigns.get() && !frontText.hasGlowingText()) signsToGlowInk.add(sign);
 
-        return new SignText(signature, signature, DyeColor.BLACK, false);
+        return signature;
     }
 
     public void disable() {
@@ -908,7 +911,7 @@ public class SignatureSign extends Module {
             for (int n = 0; n < mc.player.getInventory().getNonEquipmentItems().size(); n++) {
                 ItemStack stack = mc.player.getInventory().getItem(n);
                 if (stack.getItem() == dye) {
-                    if (current.getItem() instanceof SignItem && current.getCount() > 1) dyeSlot = n;
+                    if (current.is(ItemTags.SIGNS) && current.getCount() > 1) dyeSlot = n;
                     if (n < 9) InvUtils.swap(n, true);
                     else InvUtils.move().from(n).to(mc.player.getInventory().getSelectedSlot());
 
@@ -938,24 +941,7 @@ public class SignatureSign extends Module {
     }
 
     private Item getDyeItem(DyeColor color) {
-        return switch (color) {
-            case WHITE -> Items.WHITE_DYE;
-            case ORANGE -> Items.ORANGE_DYE;
-            case MAGENTA -> Items.MAGENTA_DYE;
-            case LIGHT_BLUE -> Items.LIGHT_BLUE_DYE;
-            case YELLOW -> Items.YELLOW_DYE;
-            case LIME -> Items.LIME_DYE;
-            case PINK -> Items.PINK_DYE;
-            case GRAY -> Items.GRAY_DYE;
-            case LIGHT_GRAY -> Items.LIGHT_GRAY_DYE;
-            case CYAN -> Items.CYAN_DYE;
-            case PURPLE -> Items.PURPLE_DYE;
-            case BLUE -> Items.BLUE_DYE;
-            case BROWN -> Items.BROWN_DYE;
-            case GREEN -> Items.GREEN_DYE;
-            case RED -> Items.RED_DYE;
-            case BLACK -> Items.BLACK_DYE;
-        };
+        return Items.DYE.pick(color);
     }
 
     @EventHandler
@@ -970,15 +956,10 @@ public class SignatureSign extends Module {
 
         if (autoConfirm.get()) {
             event.cancel();
-            SignText signature = getSignature(sign);
-            List<String> msgs = Arrays.stream(signature.getMessages(false)).map(Component::getString).toList();
-            String[] messages = new String[msgs.size()];
-            messages = msgs.toArray(messages);
+            List<String> messages = getSignature(sign);
 
             if (packetQueue.isEmpty()) packetTimer = 0;
-            packetQueue.addLast(new ServerboundSignUpdatePacket(
-                sign.getBlockPos(), true, messages[0], messages[1], messages[2], messages[3]
-            ));
+            packetQueue.addLast(new ServerboundSignUpdatePacket(sign.getBlockPos(), messages, SignTextSlot.FRONT));
             if (autoDisable.get()) {
                 toggle();
                 sendToggledMsg();
@@ -1003,7 +984,7 @@ public class SignatureSign extends Module {
             return;
         }
 
-        if (mc.screen != null) return;
+        if (mc.gui.screen() != null) return;
 
         if (timer == -1) {
             if (dyeSlot != -1) {
@@ -1033,8 +1014,8 @@ public class SignatureSign extends Module {
                 List<SignBlockEntity> signs = signsToColor
                     .stream()
                     .filter(sbe -> sbe.getBlockPos().closerThan(mc.player.blockPosition(), 5))
-                    .filter(sbe -> Arrays.stream(sbe.getFrontText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty())
-                        || Arrays.stream(sbe.getBackText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty()))
+                    .filter(sbe -> sbe.getText(SignTextSlot.FRONT).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty())
+                        || sbe.getText(SignTextSlot.BACK).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty()))
                     .toList();
 
                 if (!signs.isEmpty()) {
@@ -1047,8 +1028,8 @@ public class SignatureSign extends Module {
                 List<SignBlockEntity> signs = signsToGlowInk
                     .stream()
                     .filter(sbe -> sbe.getBlockPos().closerThan(mc.player.blockPosition(), 5))
-                    .filter(sbe -> Arrays.stream(sbe.getFrontText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty())
-                        || Arrays.stream(sbe.getBackText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty()))
+                    .filter(sbe -> sbe.getText(SignTextSlot.FRONT).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty())
+                        || sbe.getText(SignTextSlot.BACK).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty()))
                     .toList();
 
                 if (!signs.isEmpty()) {
@@ -1061,8 +1042,8 @@ public class SignatureSign extends Module {
                 List<SignBlockEntity> signs = signsToWax
                     .stream()
                     .filter(sbe -> sbe.getBlockPos().closerThan(mc.player.blockPosition(), 5))
-                    .filter(sbe -> Arrays.stream(sbe.getFrontText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty())
-                        || Arrays.stream(sbe.getBackText().getMessages(false)).anyMatch(msg -> !msg.getString().isEmpty()))
+                    .filter(sbe -> sbe.getText(SignTextSlot.FRONT).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty())
+                        || sbe.getText(SignTextSlot.BACK).getMessages(false).stream().anyMatch(msg -> !msg.getString().isEmpty()))
                     .toList();
 
                 if (!signs.isEmpty()) {

@@ -98,7 +98,7 @@ public class MsgUtil {
 
         try {
             StringBuilder sb = new StringBuilder();
-            ((IChatHud) mc.gui.getChat()).meteor$add(
+            ((IChatHud) mc.gui.hud.getChat()).meteor$add(
                 Component.literal(sb.append(getPrefix()).append(' ').append(ChatFormatting.GRAY).append(msg).toString()), hashcode
             );
         } catch (Exception ignored) {}
@@ -109,7 +109,7 @@ public class MsgUtil {
 
         try {
             StringBuilder sb = new StringBuilder();
-            ((IChatHud) mc.gui.getChat()).meteor$add(
+            ((IChatHud) mc.gui.hud.getChat()).meteor$add(
                 Component.literal(sb.append(getModulePrefix(module)).append(' ').append(ChatFormatting.GRAY).append(msg).toString()), hashcode
             );
         } catch (Exception ignored) {}

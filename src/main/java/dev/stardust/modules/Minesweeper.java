@@ -300,7 +300,7 @@ public class Minesweeper extends Module {
         if (data != null) saveData = data;
 
         try {
-            mc.setScreen(new MinesweeperScreen(this, GuiThemes.get(), "Minesweeper"));
+            mc.gui.setScreen(new MinesweeperScreen(this, GuiThemes.get(), "Minesweeper"));
         } catch (Exception err) {
             LogUtil.error("Failed to open Minesweeper screen: " + err, this.name);
             toggle();
@@ -309,9 +309,9 @@ public class Minesweeper extends Module {
 
     @Override
     public void onDeactivate() {
-        if (mc.screen instanceof MinesweeperScreen) {
+        if (mc.gui.screen() instanceof MinesweeperScreen) {
             try {
-                mc.setScreen(null);
+                mc.gui.setScreen(null);
             } catch (Exception err) {
                 LogUtil.error("Failed to close Minesweeper screen: " + err, this.name);
                 toggle();

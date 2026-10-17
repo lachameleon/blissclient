@@ -1,7 +1,7 @@
 package dev.stardust.mixin;
 
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.*;
@@ -91,7 +91,7 @@ public class SoundSystemMixin {
                 // See NarratorManagerMixin.java lol
                 switch (tweaks.getDisplayMode()) {
                     case Chat -> tweaks.sendNowPlayingMessage(songName);
-                    case Record -> tweaks.getClient().gui.setNowPlaying(Component.nullToEmpty(songName));
+                    case Record -> tweaks.getClient().gui.hud.setNowPlaying(Component.nullToEmpty(songName));
                 }
             }
         }

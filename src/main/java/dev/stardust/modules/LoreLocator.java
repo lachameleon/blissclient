@@ -167,7 +167,7 @@ public class LoreLocator extends Module {
     }
 
     private boolean shouldIgnoreCurrentScreenHandler(LocalPlayer player) {
-        if (mc.screen == null) return true;
+        if (mc.gui.screen() == null) return true;
         if (player.containerMenu == null) return true;
         AbstractContainerMenu handler = player.containerMenu;
         if (handler instanceof InventoryMenu) return !ownInventory.get();

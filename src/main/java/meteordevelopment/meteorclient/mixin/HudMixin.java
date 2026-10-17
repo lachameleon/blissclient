@@ -13,6 +13,7 @@ import meteordevelopment.meteorclient.systems.modules.misc.BetterChat;
 import meteordevelopment.meteorclient.systems.modules.render.Freecam;
 import meteordevelopment.meteorclient.systems.modules.render.NoRender;
 import meteordevelopment.meteorclient.systems.modules.render.Zoom;
+import meteordevelopment.meteorclient.systems.modules.render.ZoomPlus;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
@@ -114,6 +115,6 @@ public abstract class HudMixin {
     @Unique
     private static boolean meteor$ShouldHideHud() {
         if (GuiThemes.get() == null || Modules.get() == null) return false;
-        return MeteorClient.shouldHideHud() || Modules.get().get(Zoom.class).shouldHideHud();
+        return MeteorClient.shouldHideHud() || Modules.get().get(Zoom.class).shouldHideHud() || Modules.get().get(ZoomPlus.class).shouldHideHud();
     }
 }

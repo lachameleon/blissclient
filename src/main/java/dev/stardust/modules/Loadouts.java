@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import com.google.gson.Gson;
-import oshi.util.tuples.Pair;
+import com.mojang.datafixers.util.Pair;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import java.lang.reflect.Type;
 import dev.stardust.util.LogUtil;
@@ -243,12 +243,12 @@ public class Loadouts extends Module {
                     if (!current.isEmpty()) {
                         sorted.add(to);
                         changedSlots.put(from, current);
-                        jobs.addLast(new Pair<>(from, to));
+                        jobs.addLast(Pair.of(from, to));
                     } else {
                         sorted.add(to);
                         sorted.add(from);
                         changedSlots.remove(from);
-                        jobs.addLast(new Pair<>(from, to));
+                        jobs.addLast(Pair.of(from, to));
                     }
 
                     if (debug.get()) {
@@ -275,7 +275,7 @@ public class Loadouts extends Module {
             if (!jobs.isEmpty()) {
                 isSorted = false;
                 Pair<Integer, Integer> entry = jobs.removeFirst();
-                InvUtils.move().fromId(entry.getA()).toId(entry.getB());
+                InvUtils.move().fromId(entry.getFirst()).toId(entry.getSecond());
             }
             if (jobs.isEmpty() && !isSorted) {
                 if (!doubleTap && !isLoaded(activeLoadoutKey)) {

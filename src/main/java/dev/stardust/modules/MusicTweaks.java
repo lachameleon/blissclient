@@ -3,7 +3,7 @@ package dev.stardust.modules;
 import java.util.List;
 import java.util.ArrayList;
 import meteordevelopment.meteorclient.systems.modules.Categories;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import dev.stardust.util.StardustUtil;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.Minecraft;
@@ -1012,7 +1012,7 @@ public class MusicTweaks extends Module {
     public void sendNowPlayingMessage(String songName) {
         if (mc.player == null) return;
         String[] pieces = songName.split(" - ");
-        ((IChatHud) mc.gui.getChat()).meteor$add(
+        ((IChatHud) mc.gui.hud.getChat()).meteor$add(
             Component.nullToEmpty("§8<"+rcc+"§o✨§r§8> §2§oNow Playing§r§8: §7§o"+pieces[0]+" §8- "+rcc+"§o"+pieces[1]+"§r§8."),
             songName.hashCode()
         );

@@ -9,6 +9,7 @@ import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
@@ -443,11 +444,11 @@ public class WMinesweeper extends WWidget {
         if (c != bc || r != br) return false;
         if (r < 0 || c < 0 || r >= rows || c >= cols) return false;
 
-        if (button == 0) { // left click
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             if (firstClick && gameStart == 0) gameStart = System.currentTimeMillis();
             revealCell(r, c);
             return true;
-        } else if (button == 1) { // right click
+        } else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
             toggleFlag(r, c);
             return true;
         }

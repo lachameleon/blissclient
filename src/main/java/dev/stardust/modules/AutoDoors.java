@@ -4,7 +4,7 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import net.minecraft.world.level.block.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.Block;
@@ -161,10 +161,10 @@ public class AutoDoors extends Module {
 
         if (silentSwing.get() && ninjaSwing.get()) return;
         if (!silentSwing.get() && ninjaSwing.get()) {
-            ((LivingEntity) mc.player).swing(InteractionHand.MAIN_HAND);
+            ((LivingEntity) mc.player).swing(InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getInteractAnimation(), false);
         }else if (silentSwing.get() && !ninjaSwing.get()) {
-            if (mc.getConnection() != null) mc.getConnection().send(new ServerboundSwingPacket(InteractionHand.MAIN_HAND));
-        }else mc.player.swing(InteractionHand.MAIN_HAND);
+            if (mc.getConnection() != null) mc.getConnection().send(new ServerboundPunchPacket());
+        }else mc.player.swing(InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getInteractAnimation(), false);
     }
 
     private @NotNull Direction getDirection(BlockPos pos, Direction direction) {

@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 public class DoubleDoorsInteract extends Module {
     boolean isInteracting = false;
@@ -43,7 +44,7 @@ public class DoubleDoorsInteract extends Module {
                 if (blockState.getValue(DoorBlock.HALF) == otherBlockState.getValue(DoorBlock.HALF)
                         && blockState.getValue(DoorBlock.HINGE) != otherBlockState.getValue(DoorBlock.HINGE)
                         && blockState.getValue(DoorBlock.OPEN) == otherBlockState.getValue(DoorBlock.OPEN)) {
-                    BlockUtils.interact(new BlockHitResult(otherDoorPos.getCenter(), Direction.UP, otherDoorPos, false), InteractionHand.MAIN_HAND, false);
+                    BlockUtils.interact(new BlockHitResult(Vec3.atCenterOf(otherDoorPos), Direction.UP, otherDoorPos, false), InteractionHand.MAIN_HAND, false);
                 }
             }
         }
