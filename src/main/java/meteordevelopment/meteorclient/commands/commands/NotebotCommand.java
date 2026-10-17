@@ -5,10 +5,13 @@
 
 package meteordevelopment.meteorclient.commands.commands;
 
+import com.mojang.blaze3d.Blaze3D;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.commands.Command;
 import meteordevelopment.meteorclient.commands.arguments.NotebotSongArgumentType;
@@ -22,23 +25,22 @@ import net.minecraft.client.multiplayer.ClientSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.util.Util;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 
-import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class NotebotCommand extends Command {
     private static final SimpleCommandExceptionType INVALID_SONG = new SimpleCommandExceptionType(Component.literal("Invalid song."));
     private static final DynamicCommandExceptionType INVALID_PATH = new DynamicCommandExceptionType(object -> Component.literal("'%s' is not a valid path.".formatted(object)));
 
-    int ticks = -1;
-    private final Map<Integer, List<Note>> song = new HashMap<>(); // tick -> notes
+    private int ticks = -1;
+    private final Int2ObjectMap<List<Note>> song = new Int2ObjectOpenHashMap<>(); // tick -> notes
 
     public NotebotCommand() {
         super("notebot", "Allows you load notebot files");
@@ -47,7 +49,7 @@ public class NotebotCommand extends Command {
     @Override
     public void build(LiteralArgumentBuilder<ClientSuggestionProvider> builder) {
         builder.then(literal("help").executes(_ -> {
-            Util.getPlatform().openUri("https://github.com/MeteorDevelopment/meteor-client/wiki/Notebot-Guide");
+            Blaze3D.openUri(URI.create("https://github.com/MeteorDevelopment/meteor-client/wiki/Notebot-Guide"));
             return SINGLE_SUCCESS;
         }));
 
@@ -86,7 +88,7 @@ public class NotebotCommand extends Command {
                 argument("song", NotebotSongArgumentType.create()).executes(ctx -> {
                     Notebot notebot = Modules.get().get(Notebot.class);
                     Path songPath = ctx.getArgument("song", Path.class);
-                    if (songPath == null || !songPath.toFile().exists()) {
+                    if (songPath == null || !Files.exists(songPath)) {
                         throw INVALID_SONG.create();
                     }
                     notebot.loadSong(songPath.toFile());
@@ -100,7 +102,7 @@ public class NotebotCommand extends Command {
                 argument("song", NotebotSongArgumentType.create()).executes(ctx -> {
                     Notebot notebot = Modules.get().get(Notebot.class);
                     Path songPath = ctx.getArgument("song", Path.class);
-                    if (songPath == null || !songPath.toFile().exists()) {
+                    if (songPath == null || !Files.exists(songPath)) {
                         throw INVALID_SONG.create();
                     }
                     notebot.previewSong(songPath.toFile());
@@ -159,23 +161,21 @@ public class NotebotCommand extends Command {
             MeteorClient.EVENT_BUS.unsubscribe(this);
             return;
         }
-        try {
+        try (var writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             MeteorClient.EVENT_BUS.unsubscribe(this);
 
-            FileWriter file = new FileWriter(path.toFile());
-            for (var entry : song.entrySet()) {
-                int tick = entry.getKey();
+            for (var entry : song.int2ObjectEntrySet()) {
+                int tick = entry.getIntKey();
                 List<Note> notes = entry.getValue();
 
                 for (var note : notes) {
                     NoteBlockInstrument instrument = note.getInstrument();
                     int noteLevel = note.getNoteLevel();
 
-                    file.write(String.format("%d:%d:%d\n", tick, noteLevel, instrument.ordinal()));
+                    writer.write(String.format("%d:%d:%d\n", tick, noteLevel, instrument.ordinal()));
                 }
             }
 
-            file.close();
             info("Song saved.");
         } catch (IOException _) {
             info("Couldn't create the file.");

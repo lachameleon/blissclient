@@ -28,32 +28,31 @@ import meteordevelopment.meteorclient.utils.render.prompts.OkPrompt;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.PointerBuffer;
+import org.apache.commons.io.FilenameUtils;
+import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDLError;
+import org.lwjgl.sdl.SDL_DialogFileFilter;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class ProfilesTab extends Tab {
-    private static final PointerBuffer filters;
+    private static final SDL_DialogFileFilter.Buffer filters;
 
     static {
-        filters = BufferUtils.createPointerBuffer(1);
-
-        ByteBuffer pngFilter = MemoryUtil.memASCII("*.nbt");
-
-        filters.put(pngFilter);
-        filters.rewind();
+        MemoryStack stack = MemoryStack.stackPush();
+        filters = SDL_DialogFileFilter.malloc(1, stack);
+        filters.name(stack.UTF8("NBT Files")).pattern(stack.UTF8("nbt"));
     }
 
     public ProfilesTab() {
@@ -87,27 +86,36 @@ public class ProfilesTab extends Tab {
             // Create
             WButton create = l.add(theme.button("Create")).expandX().widget();
             create.tooltip = "Create new profile";
-            create.action = () -> mc.setScreen(new EditProfileScreen(theme, null, this::reload));
+            create.action = () -> mc.gui.setScreen(new EditProfileScreen(theme, null, this::reload));
 
             // Import
             WButton importBtn = l.add(theme.button("Import")).expandX().widget();
             importBtn.tooltip = "Import profile";
-            importBtn.action = () -> {
+            importBtn.action = () -> SDLDialog.SDL_ShowOpenFileDialog((_, file, _) -> {
                 try {
-                    Profile imported = importProfile();
-                    if (imported != null)
-                        MeteorClient.LOG.info("Successfully imported profile '{}'.", imported.name.get());
+                    if (file == 0) throw new IOException("Dialog Error: " + SDLError.SDL_GetError());
+
+                    long filePointer = MemoryUtil.memGetAddress(file);
+                    if (filePointer == 0) return;
+
+                    String path = MemoryUtil.memUTF8(filePointer);
+                    File profileFile = new File(path);
+
+                    Profile profile = importProfile(profileFile);
+
+                    if (profile != null)
+                        MeteorClient.LOG.info("Successfully imported profile '{}'.", profile.name.get());
                     reload();
-                } catch (IOException e) {
+                } catch (Exception e) {
                     MeteorClient.LOG.error("Error importing profile", e);
                     OkPrompt.create()
                         .title("Failure importing profile")
                         .message("There was an error importing the profile.")
-                        .message("Error: %d", e.getMessage())
+                        .message("Error: %s", e.getMessage())
                         .dontShowAgainCheckboxVisible(false)
                         .show();
                 }
-            };
+            }, 0L, 0, filters, "", false);
         }
 
         private void initTable(WTable table) {
@@ -125,10 +133,10 @@ public class ProfilesTab extends Tab {
                 load.action = profile::load;
 
                 WButton export = table.add(theme.button("Export")).widget();
-                export.action = () -> mc.setScreen(new ExportProfileScreen(theme, profile));
+                export.action = () -> mc.gui.setScreen(new ExportProfileScreen(theme, profile));
 
                 WButton edit = table.add(theme.button(GuiRenderer.EDIT)).widget();
-                edit.action = () -> mc.setScreen(new EditProfileScreen(theme, profile, this::reload));
+                edit.action = () -> mc.gui.setScreen(new EditProfileScreen(theme, profile, this::reload));
 
                 WConfirmedMinus remove = table.add(theme.confirmedMinus()).widget();
                 remove.action = () -> {
@@ -140,21 +148,31 @@ public class ProfilesTab extends Tab {
             }
         }
 
-        private Profile importProfile() throws IOException {
-            String file = TinyFileDialogs.tinyfd_openFileDialog("Select profile to import", null, filters, null, false);
-            if (file == null) return null;
-            File profileFile = new File(file);
-
+        private Profile importProfile(File profileFile) throws IOException {
             CompoundTag nbt = NbtIo.read(profileFile.toPath());
+            if (nbt == null) return null;
 
             Profile p = new Profile();
-            p.name.set(nbt.getStringOr("name", profileFile.getName()));
-            //noinspection ResultOfMethodCallIgnored
-            p.getFile().mkdirs();
+            Optional<String> parsedName = nbt.getString("name").filter(n -> !n.isEmpty());
 
+            if (parsedName.filter(p.name::set).isEmpty() && !p.name.set(FilenameUtils.removeExtension(profileFile.getName()))) {
+                throw new IllegalStateException("Imported profile does not have a valid name.");
+            }
+
+            File profileFolder = p.getFile().getCanonicalFile();
+            if (!profileFolder.getParentFile().equals(Profiles.FOLDER.getCanonicalFile())) {
+                throw new IllegalStateException("Imported profile does not have a valid location.");
+            }
+
+            //noinspection ResultOfMethodCallIgnored
+            profileFolder.mkdirs();
             nbt.remove("name");
+
+            boolean valid = false;
             for (var entry : nbt.entrySet()) {
                 String filename = entry.getKey();
+                if (!filename.endsWith(".nbt")) continue;
+                if (filename.contains("/") || filename.contains("\\") || new File(filename).isAbsolute()) continue;
 
                 switch (filename) {
                     case "hud.nbt" -> p.hud.set(true);
@@ -165,8 +183,15 @@ public class ProfilesTab extends Tab {
                     }
                 }
 
-                File f = new File(p.getFile(), filename);
+                File f = new File(profileFolder, filename).getCanonicalFile();
+                if (!f.toPath().startsWith(profileFolder.toPath())) continue;
+
+                valid = true;
                 NbtIo.writeUnnamedTagWithFallback(entry.getValue(), new DataOutputStream(new FileOutputStream(f)));
+            }
+
+            if (!valid) {
+                throw new IllegalStateException("Imported file is not a profile.");
             }
 
             Profiles.get().getAll().add(p);
@@ -260,20 +285,26 @@ public class ProfilesTab extends Tab {
 
             WContainer settingsContainer = add(theme.verticalList()).expandX().minWidth(400).widget();
 
-            settingsContainer.add(theme.horizontalSeparator()).expandX().widget();
+            settingsContainer.add(theme.horizontalSeparator()).expandX();
 
             WCheckbox hud = addBool(settingsContainer, profile.settings.get("hud", Boolean.class));
             WCheckbox macros = addBool(settingsContainer, profile.settings.get("macros", Boolean.class));
             WCheckbox modules = addBool(settingsContainer, profile.settings.get("modules", Boolean.class));
             WCheckbox waypoints = addBool(settingsContainer, profile.settings.get("waypoints", Boolean.class));
 
-            add(theme.horizontalSeparator()).expandX().widget();
+            add(theme.horizontalSeparator()).expandX();
 
             WButton export = add(theme.button("Export profile")).expandX().widget();
-            export.action = () -> {
-                exportProfile(profile, hud.checked, macros.checked, modules.checked, waypoints.checked);
+            export.action = () -> SDLDialog.SDL_ShowSaveFileDialog((_, file, _) -> {
+                if (file == 0) return;
+
+                long filePointer = MemoryUtil.memGetAddress(file);
+                if (filePointer == 0) return;
+
+                String path = MemoryUtil.memUTF8(filePointer);
+                exportProfile(path, profile, hud.checked, macros.checked, modules.checked, waypoints.checked);
                 onClose();
-            };
+            }, 0, 0, filters, "");
         }
 
         private WCheckbox addBool(WContainer container, Setting<Boolean> setting) {
@@ -286,8 +317,7 @@ public class ProfilesTab extends Tab {
             return c;
         }
 
-        private void exportProfile(Profile profile, boolean hud, boolean macros, boolean modules, boolean waypoints) {
-            String path = TinyFileDialogs.tinyfd_saveFileDialog("Save profile", profile.name.get(), filters, null);
+        private void exportProfile(String path, Profile profile, boolean hud, boolean macros, boolean modules, boolean waypoints) {
             if (path == null) return;
             Path p = Path.of(path.endsWith(".nbt") ? path : path + ".nbt");
 

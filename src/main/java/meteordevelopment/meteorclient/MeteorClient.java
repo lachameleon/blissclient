@@ -9,7 +9,6 @@ import dev.stardust.config.StardustConfig;
 import dev.stardust.util.MsgUtil;
 import meteordevelopment.meteorclient.addons.AddonManager;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
-import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.meteor.KeyInputEvent;
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
@@ -33,13 +32,13 @@ import meteordevelopment.meteorclient.utils.misc.input.KeyBinds;
 import meteordevelopment.meteorclient.utils.network.OnlinePlayers;
 import meteordevelopment.orbit.EventBus;
 import meteordevelopment.orbit.EventHandler;
-import meteordevelopment.orbit.EventPriority;
 import meteordevelopment.orbit.IEventBus;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +70,6 @@ public class MeteorClient implements ClientModInitializer {
 
         String versionString = MOD_META.getVersion().getFriendlyString();
         if (versionString.contains("-")) versionString = versionString.split("-")[0];
-
         // When building and running through IntelliJ and not Gradle it doesn't replace the version so just use a dummy
         if (versionString.equals("${version}")) versionString = "0.0.0";
 
@@ -157,8 +155,8 @@ public class MeteorClient implements ClientModInitializer {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.screen == null && mc.getOverlay() == null && KeyBinds.OPEN_COMMANDS.consumeClick()) {
-            mc.setScreen(new ChatScreen(Config.get().prefix.get(), true));
+        if (mc.gui.screen() == null && mc.gui.overlay() == null && KeyBinds.OPEN_COMMANDS.consumeClick()) {
+            mc.gui.setScreen(new ChatScreen(Config.get().prefix.get(), true));
         }
     }
 
@@ -177,31 +175,21 @@ public class MeteorClient implements ClientModInitializer {
     }
 
     private void toggleGui() {
-        if (Utils.canCloseGui()) mc.screen.onClose();
+        if (Utils.canCloseGui()) mc.gui.screen().onClose();
         else if (Utils.canOpenGui()) Tabs.get().getFirst().openScreen(GuiThemes.get());
     }
 
     // Hide HUD
 
-    private boolean wasWidgetScreen, wasHudHiddenRoot;
+    public static boolean shouldHideHud() {
+        if (!GuiThemes.get().hideHUD()) return false;
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    private void onOpenScreen(OpenScreenEvent event) {
-        if (event.screen instanceof WidgetScreen) {
-            if (!wasWidgetScreen) wasHudHiddenRoot = mc.options.hideGui;
-            if (GuiThemes.get().hideHUD() || wasHudHiddenRoot) {
-                // Always show the MC HUD in the HUD editor screen since people like
-                // to align some items with the hotbar or chat
-                mc.options.hideGui = !(event.screen instanceof HudEditorScreen)
-                    && !(event.screen instanceof AddHudElementScreen)
-                    && !(event.screen instanceof HudElementScreen);
-            }
-        } else {
-            if (wasWidgetScreen) mc.options.hideGui = wasHudHiddenRoot;
-            wasHudHiddenRoot = mc.options.hideGui;
-        }
+        Screen screen = mc.gui.screen();
+        if (!(screen instanceof WidgetScreen)) return false;
 
-        wasWidgetScreen = event.screen instanceof WidgetScreen;
+        return !(screen instanceof HudEditorScreen)
+            && !(screen instanceof AddHudElementScreen)
+            && !(screen instanceof HudElementScreen);
     }
 
     public static Identifier identifier(String path) {

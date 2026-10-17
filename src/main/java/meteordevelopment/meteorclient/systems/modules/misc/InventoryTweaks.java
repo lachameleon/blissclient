@@ -36,10 +36,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.DecoratedPotBlock;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_MIDDLE;
 
 public class InventoryTweaks extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -98,7 +99,7 @@ public class InventoryTweaks extends Module {
         .name("sorting-key")
         .description("Key to trigger the sort.")
         .visible(sortingEnabled::get)
-        .defaultValue(Keybind.fromButton(GLFW.GLFW_MOUSE_BUTTON_MIDDLE))
+        .defaultValue(Keybind.fromButton(MOUSE_BUTTON_MIDDLE))
         .build()
     );
 
@@ -311,7 +312,7 @@ public class InventoryTweaks extends Module {
     }
 
     private boolean sort() {
-        if (!sortingEnabled.get() || !(mc.screen instanceof AbstractContainerScreen<?> screen) || sorter != null || (mc.player.isCreative() && disableInCreative.get()))
+        if (!sortingEnabled.get() || !(mc.gui.screen() instanceof AbstractContainerScreen<?> screen) || sorter != null || (mc.player.isCreative() && disableInCreative.get()))
             return false;
 
         if (!mc.player.containerMenu.getCarried().isEmpty()) {
@@ -342,7 +343,7 @@ public class InventoryTweaks extends Module {
     @EventHandler
     private void onTickPost(TickEvent.Post event) {
         // Auto Drop
-        if (!Utils.canUpdate() || mc.screen instanceof AbstractContainerScreen<?> || autoDropItems.get().isEmpty())
+        if (!Utils.canUpdate() || mc.gui.screen() instanceof AbstractContainerScreen<?> || autoDropItems.get().isEmpty())
             return;
 
         for (int i = autoDropExcludeHotbar.get() ? 9 : 0; i < mc.player.getInventory().getContainerSize(); i++) {
@@ -414,7 +415,7 @@ public class InventoryTweaks extends Module {
             if (!handler.getSlot(i).hasItem()) continue;
 
             // Exit if user closes screen or exit world
-            if (mc.screen == null || !Utils.canUpdate()) break;
+            if (mc.gui.screen() == null || !Utils.canUpdate()) break;
 
             Item item = handler.getSlot(i).getItem().getItem();
             if (steal) {
@@ -443,7 +444,7 @@ public class InventoryTweaks extends Module {
             }
 
             // Exit if user closes screen or exit world
-            if (mc.screen == null || !Utils.canUpdate()) break;
+            if (mc.gui.screen() == null || !Utils.canUpdate()) break;
 
             if (steal && stealDrop.get()) {
                 if (dropBackwards.get()) {

@@ -6,8 +6,8 @@
 package meteordevelopment.meteorclient.gui.renderer.packer;
 
 import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.textures.FilterMode;
 import meteordevelopment.meteorclient.renderer.Texture;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.BufferUtils;
@@ -142,7 +142,7 @@ public class TexturePacker {
 
         ((Buffer) buffer).rewind();
 
-        Texture texture = new Texture(width, height, TextureFormat.RGBA8, FilterMode.LINEAR, FilterMode.LINEAR);
+        Texture texture = new Texture(width, height, GpuFormat.RGBA8_UNORM, FilterMode.LINEAR, FilterMode.LINEAR);
         texture.upload(buffer);
 
         return texture;

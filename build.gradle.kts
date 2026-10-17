@@ -1,11 +1,18 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     alias(libs.plugins.fabric.loom)
     id("maven-publish")
+    alias(libs.plugins.errorprone)
 }
 
+val archivesBaseName = providers.gradleProperty("archives_base_name").get()
+val mavenGroup = providers.gradleProperty("maven_group").get()
+val runErrorProne = providers.gradleProperty("errorprone").isPresent
+
 base {
-    archivesName = properties["archives_base_name"] as String
-    group = properties["maven_group"] as String
+    archivesName = archivesBaseName
+    group = mavenGroup
 
     val suffix = providers.gradleProperty("build_number").getOrElse("local")
     version = "${libs.versions.minecraft.get()}-$suffix"
@@ -19,10 +26,6 @@ repositories {
     maven {
         name = "meteor-maven-snapshots"
         url = uri("https://maven.meteordev.org/snapshots")
-    }
-    maven {
-        name = "Terraformers"
-        url = uri("https://maven.terraformersmc.com")
     }
     maven {
         name = "ViaVersion"
@@ -43,8 +46,11 @@ repositories {
     }
 }
 
-val modInclude: Configuration by configurations.creating
-val jij: Configuration by configurations.creating
+val modInclude = configurations.create("modInclude")
+val jij = configurations.create("jij")
+val launcher = sourceSets.create("launcher") {
+    java.srcDir("src/launcher/java")
+}
 
 configurations {
     // include mods
@@ -78,8 +84,6 @@ dependencies {
     compileOnly(libs.sodium) { isTransitive = false }
     compileOnly(libs.lithium) { isTransitive = false }
     compileOnly(libs.iris) { isTransitive = false }
-    compileOnly(libs.viafabricplus) { isTransitive = false }
-    compileOnly(libs.viafabricplus.api) { isTransitive = false }
 
     compileOnly(libs.baritone)
     compileOnly(libs.modmenu)
@@ -92,14 +96,14 @@ dependencies {
     jij(libs.netty.codec.socks) { isTransitive = false }
     jij(libs.waybackauthlib)
     jij("org.java-websocket:Java-WebSocket:1.6.0")
-}
-
-sourceSets {
-    val launcher by creating {
-        java {
-            srcDir("src/launcher/java")
-        }
+    jij(libs.minecraft.auth) {
+        exclude("com.google.code.gson")
+        exclude("com.google.errorprone")
     }
+
+    // Error Prone
+    errorprone(libs.errorprone.core)
+    errorprone(libs.nullaway)
 }
 
 java {
@@ -140,12 +144,28 @@ loom {
 }
 
 fun toMinecraftCompat(version: String): String {
-    val match = Regex("""^(\d{2})\.([1-9]\d*)(?:\.([1-9]\d*))?$""")
-        .matchEntire(version)
-        ?: error("Invalid Minecraft version format: $version. Expected YY.D or YY.D.H")
+    // Stable release
+    val stable = Regex("""^(\d{2})\.([1-9]\d*)(?:\.(\d+))?$""")
 
-    val (year, drop, _) = match.destructured
-    return "~$year.$drop"
+    stable.matchEntire(version)?.let {
+        val (year, drop, _) = it.destructured
+        return "~$year.$drop"
+    }
+
+    // Prerelease
+    val pre = Regex("""^(\d{2})\.([1-9]\d*)-pre[-.](\d+)$""")
+    pre.matchEntire(version)?.let {
+        return version.replace("-pre-", "-pre.")
+    }
+
+    // Release Candidate
+    val rc = Regex("""^(\d{2})\.([1-9]\d*)-rc[-.](\d+)$""")
+    rc.matchEntire(version)?.let {
+        return version.replace("-rc-", "-rc.")
+    }
+
+    // fallback
+    return version
 }
 
 tasks {
@@ -176,14 +196,15 @@ tasks {
     }
 
     jar {
-        inputs.property("archivesName", project.base.archivesName.get())
+        inputs.property("archivesName", archivesBaseName)
+        val licenseName = "LICENSE_$archivesBaseName"
 
         from("LICENSE") {
-            rename { "${it}_${inputs.properties["archivesName"]}" }
+            rename("LICENSE", licenseName)
         }
 
         // Include launcher classes
-        from(sourceSets["launcher"].output)
+        from(launcher.output)
 
         manifest {
             attributes["Main-Class"] = "meteordevelopment.meteorclient.Main"
@@ -197,6 +218,18 @@ tasks {
                 "-Xlint:unchecked"
             )
         )
+
+        options.errorprone.enabled.set(runErrorProne)
+
+        if (runErrorProne) {
+            options.errorprone {
+                check("NullAway", net.ltgt.gradle.errorprone.CheckSeverity.ERROR)
+                option("NullAway:AnnotatedPackages", "meteordevelopment.meteorclient")
+                option("NullAway:JSpecifyMode", "true")
+                // Event handlers are discovered reflectively by Orbit.
+                option("UnusedMethod:ExcludedAnnotations", "meteordevelopment.orbit.EventHandler")
+            }
+        }
     }
 
     javadoc {
