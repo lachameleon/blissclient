@@ -33,7 +33,6 @@
     "meteor-client-indigo.mixins.json",
     "meteor-client-sodium.mixins.json",
     "meteor-client-lithium.mixins.json",
-    "meteor-client-viafabricplus.mixins.json",
     "stardust.mixins.json"
   ],
   "accessWidener": "meteor-client.classtweaker",
@@ -59,7 +58,7 @@
     "optifabric": "*",
     "feather": "*",
     "origins": "*",
-    "sodium": "<0.8.7",
+    "sodium": "<0.9.1",
     "morechathistory": "*",
     "lithium": "<0.22.1"
   }

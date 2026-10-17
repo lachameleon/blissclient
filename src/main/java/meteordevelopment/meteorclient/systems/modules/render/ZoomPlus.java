@@ -369,7 +369,6 @@ public class ZoomPlus extends Module {
         deactivated = false;
 
         if (!isSubscribed) {
-            if (hideHud.get()) mc.options.hideGui = true;
             MeteorClient.EVENT_BUS.subscribe(this);
             MeteorClient.EVENT_BUS.subscribe(tweenHandler);
             isSubscribed = true;
@@ -433,6 +432,10 @@ public class ZoomPlus extends Module {
     }
 
     // Removed custom event handlers for HandRenderEvent, MouseSensitivityEvent, UpdateCameraSmoothingEvent, SmoothCameraEnabledEvent as they don't exist in main project
+
+    public boolean shouldHideHud() {
+        return isActive() && hideHud.get();
+    }
 
     private double getScaling() {
         double finalZoomFactor = currentZoomFactor.get() + currentScrollStep.get();

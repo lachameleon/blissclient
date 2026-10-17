@@ -13,10 +13,7 @@ import meteordevelopment.meteorclient.systems.friends.Friends;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
-import meteordevelopment.meteorclient.utils.entity.EntityUtils;
-import meteordevelopment.meteorclient.utils.entity.SortPriority;
-import meteordevelopment.meteorclient.utils.entity.Target;
-import meteordevelopment.meteorclient.utils.entity.TargetUtils;
+import meteordevelopment.meteorclient.utils.entity.*;
 import meteordevelopment.meteorclient.utils.entity.fakeplayer.FakePlayerEntity;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
@@ -32,7 +29,7 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.animal.frog.Frog;
 import net.minecraft.world.entity.animal.parrot.Parrot;
 import net.minecraft.world.entity.animal.wolf.Wolf;
-import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Enderman;
 import net.minecraft.world.entity.monster.Zoglin;
 import net.minecraft.world.entity.monster.hoglin.Hoglin;
 import net.minecraft.world.entity.monster.piglin.Piglin;
@@ -131,7 +128,7 @@ public class KillAura extends Module {
         .name("entities")
         .description("Entities to attack.")
         .onlyAttackable()
-        .defaultValue(EntityType.PLAYER)
+        .defaultValue(EntityTypes.PLAYER)
         .build()
     );
 
@@ -170,17 +167,17 @@ public class KillAura extends Module {
         .build()
     );
 
-    private final Setting<EntityAge> passiveMobAgeFilter = sgTargeting.add(new EnumSetting.Builder<EntityAge>()
+    private final Setting<EntityAgeTest> passiveMobAgeFilter = sgTargeting.add(new EnumSetting.Builder<EntityAgeTest>()
         .name("passive-mob-age-filter")
         .description("Determines the age of passive mobs to target (animals, villagers).")
-        .defaultValue(EntityAge.Adult)
+        .defaultValue(EntityAgeTest.Adult)
         .build()
     );
 
-    private final Setting<EntityAge> hostileMobAgeFilter = sgTargeting.add(new EnumSetting.Builder<EntityAge>()
+    private final Setting<EntityAgeTest> hostileMobAgeFilter = sgTargeting.add(new EnumSetting.Builder<EntityAgeTest>()
         .name("hostile-mob-age-filter")
         .description("Determines the age of hostile mobs to target (zombies, piglins, hoglins, zoglins).")
-        .defaultValue(EntityAge.Both)
+        .defaultValue(EntityAgeTest.Both)
         .build()
     );
 
@@ -261,7 +258,7 @@ public class KillAura extends Module {
         .build()
     );
 
-    private final static ArrayList<Item> FILTER = new ArrayList<>(List.of(Items.DIAMOND_SWORD, Items.DIAMOND_AXE, Items.DIAMOND_PICKAXE, Items.DIAMOND_SHOVEL, Items.DIAMOND_HOE, Items.MACE, Items.DIAMOND_SPEAR, Items.TRIDENT));
+    private final static Set<Item> FILTER = Set.of(Items.DIAMOND_SWORD, Items.DIAMOND_AXE, Items.DIAMOND_PICKAXE, Items.DIAMOND_SHOVEL, Items.DIAMOND_HOE, Items.MACE, Items.DIAMOND_SPEAR, Items.TRIDENT);
     private final List<Entity> targets = new ArrayList<>();
     private int switchTimer, hitTimer;
     private boolean wasPathing = false;
@@ -334,7 +331,7 @@ public class KillAura extends Module {
                 weaponResult = InvUtils.find(this::acceptableWeapon, 0, 8);
 
             if (shouldShieldBreak()) {
-                FindItemResult axeResult = InvUtils.find(itemStack -> itemStack.getItem() instanceof AxeItem, 0, 8);
+                FindItemResult axeResult = InvUtils.find(itemStack -> itemStack.is(ItemTags.AXES), 0, 8);
                 if (axeResult.found()) weaponResult = axeResult;
             }
 
@@ -418,7 +415,7 @@ public class KillAura extends Module {
             ) return false;
         }
         if (ignorePassive.get()) {
-            if (entity instanceof EnderMan enderman && !enderman.isAngry()) return false;
+            if (entity instanceof Enderman enderman && !enderman.isCreepy()) return false;
             if ((entity instanceof Piglin || entity instanceof ZombifiedPiglin || entity instanceof Wolf) && !((Mob) entity).isAggressive())
                 return false;
         }
@@ -432,19 +429,11 @@ public class KillAura extends Module {
             // Hostile mobs with baby variants (zombies, piglins, hoglins, zoglins)
             if (entity instanceof Zombie || entity instanceof Piglin
                 || entity instanceof Hoglin || entity instanceof Zoglin) {
-                return switch (hostileMobAgeFilter.get()) {
-                    case Baby -> livingEntity.isBaby();
-                    case Adult -> !livingEntity.isBaby();
-                    case Both -> true;
-                };
+                return hostileMobAgeFilter.get().test(livingEntity);
             }
             // Passive mobs with baby variants (animals, villagers)
             if (entity instanceof AgeableMob && (!(entity instanceof Frog || entity instanceof Parrot))) {
-                return switch (passiveMobAgeFilter.get()) {
-                    case Baby -> livingEntity.isBaby();
-                    case Adult -> !livingEntity.isBaby();
-                    case Both -> true;
-                };
+                return passiveMobAgeFilter.get().test(livingEntity);
             }
         }
         return true;
@@ -472,13 +461,13 @@ public class KillAura extends Module {
             Rotations.rotate(Rotations.getYaw(target), Rotations.getPitch(target, Target.Body));
 
         mc.gameMode.attack(mc.player, target);
-        mc.player.swing(InteractionHand.MAIN_HAND);
+        mc.player.swing(InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getAttackAnimation(), false);
 
         hitTimer = 0;
     }
 
     private boolean acceptableWeapon(ItemStack stack) {
-        if (shouldShieldBreak()) return stack.getItem() instanceof AxeItem;
+        if (shouldShieldBreak()) return stack.is(ItemTags.AXES);
         if (attackWhenHolding.get() == AttackItems.All) return true;
 
         if (weapons.get().contains(Items.DIAMOND_SWORD) && stack.is(ItemTags.SWORDS)) return true;
@@ -519,9 +508,4 @@ public class KillAura extends Module {
         None
     }
 
-    public enum EntityAge {
-        Baby,
-        Adult,
-        Both
-    }
 }

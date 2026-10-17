@@ -45,9 +45,9 @@ import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.apache.commons.io.FilenameUtils;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.util.*;
@@ -117,9 +117,9 @@ public class Notebot extends Module {
         .build()
     );
 
-    public final Setting<Boolean> roundOutOfRange = sgGeneral.add(new BoolSetting.Builder()
-        .name("round-out-of-range")
-        .description("Rounds out of range notes")
+    public final Setting<Boolean> transposeOutOfRange = sgGeneral.add(new BoolSetting.Builder()
+        .name("transpose-out-of-range")
+        .description("Transposes out of range notes")
         .defaultValue(false)
         .build()
     );
@@ -237,7 +237,7 @@ public class Notebot extends Module {
     private Song song; // Loaded song
     private final Map<Note, BlockPos> noteBlockPositions = new HashMap<>(); // Currently used noteblocks by the song
     private final Multimap<Note, BlockPos> scannedNoteblocks = MultimapBuilder.linkedHashKeys().arrayListValues().build(); // Found noteblocks
-    private final List<BlockPos> clickedBlocks = new ArrayList<>();
+    private final Set<BlockPos> clickedBlocks = new HashSet<>();
     private Stage stage = Stage.None;
     private PlayingMode playingMode = PlayingMode.None;
     private boolean isPlaying = false;
@@ -388,8 +388,8 @@ public class Notebot extends Module {
 
             TextRenderer text = TextRenderer.get();
 
-            NametagUtils.begin(pos);
-            text.beginBig();
+            NametagUtils.begin(pos, event.graphics);
+            text.beginBig(event.graphics);
 
             double xScreen = text.getWidth(levelText) / 2.0;
             if (tuneHitsText != null) {
@@ -402,7 +402,7 @@ public class Notebot extends Module {
             }
             text.end();
 
-            NametagUtils.end();
+            NametagUtils.end(event.graphics);
         }
     }
 
@@ -562,7 +562,7 @@ public class Notebot extends Module {
 
         // Open Song GUI
         WButton openSongGUI = table.add(theme.button("Open Song GUI")).expandX().minWidth(100).widget();
-        openSongGUI.action = () -> mc.setScreen(theme.notebotSongs());
+        openSongGUI.action = () -> mc.gui.setScreen(theme.notebotSongs());
 
         table.row();
 
@@ -834,7 +834,7 @@ public class Notebot extends Module {
         }
 
         if (swingArm.get()) {
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getAttackAnimation(), false);
         }
 
         int iterations = 0;
@@ -904,7 +904,7 @@ public class Notebot extends Module {
 
             // Swing arm
             if (swingArm.get()) {
-                mc.player.swing(InteractionHand.MAIN_HAND);
+                mc.player.swing(InteractionHand.MAIN_HAND, mc.player.getMainHandItem().getAttackAnimation(), false);
             }
 
             // Play notes
@@ -943,7 +943,7 @@ public class Notebot extends Module {
      * @return A new instrument mapped by instrument given in parameters
      */
     @Nullable
-    public NoteBlockInstrument getMappedInstrument(@NotNull NoteBlockInstrument inst) {
+    public NoteBlockInstrument getMappedInstrument(@NonNull NoteBlockInstrument inst) {
         if (mode.get() == NotebotUtils.NotebotMode.ExactInstruments) {
             NotebotUtils.OptionalInstrument optionalInstrument = (NotebotUtils.OptionalInstrument) sgNoteMap.getByIndex(inst.ordinal()).get();
             return optionalInstrument.toMinecraftInstrument();

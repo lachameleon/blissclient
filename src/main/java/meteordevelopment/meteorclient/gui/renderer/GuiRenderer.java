@@ -121,14 +121,14 @@ public class GuiRenderer {
         rTex.render("u_Texture", TEXTURE.getTextureView(), TEXTURE.getSampler());
 
         // Normal text
-        theme.textRenderer().begin(theme.scale(1));
+        theme.textRenderer().begin(graphics, theme.scale(1));
         for (TextOperation text : texts) {
             if (!text.title) text.run(textPool);
         }
         theme.textRenderer().end();
 
         // Title text
-        theme.textRenderer().begin(theme.scale(1.25));
+        theme.textRenderer().begin(graphics, theme.scale(1.25));
         for (TextOperation text : texts) {
             if (text.title) text.run(textPool);
         }
@@ -236,6 +236,10 @@ public class GuiRenderer {
 
     public void quad(WWidget widget, Color color) {
         quad(widget.x, widget.y, widget.width, widget.height, color);
+    }
+
+    public void fill(WWidget widget, Color color) {
+        graphics.fill((int) widget.x, (int) widget.y, (int) (widget.x + widget.width), (int) (widget.y + widget.height), color.getPacked());
     }
 
     public void quad(double x, double y, double width, double height, GuiTexture texture, Color color) {

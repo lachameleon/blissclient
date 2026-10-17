@@ -120,7 +120,7 @@ public class PlayerStatsScreen extends WindowScreen {
             table.add(theme.label("%d".formatted(stats.sightingCount)));
             table.add(theme.label(formatAgo(stats.lastSeen)));
             WButton view = table.add(theme.button("Open")).right().widget();
-            view.action = () -> mc.setScreen(new PlayerStatsScreen(theme, tracker, stats));
+            view.action = () -> mc.gui.setScreen(new PlayerStatsScreen(theme, tracker, stats));
             table.row();
         }
 

@@ -2,12 +2,13 @@ package dev.stardust.util;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.Optional;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.network.protocol.game.*;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.network.protocol.game.ServerboundChatPacket;
@@ -21,6 +22,8 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.resources.Identifier;
 import io.netty.util.internal.ThreadLocalRandom;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.world.Dimension;
@@ -148,14 +151,19 @@ public class StardustUtil {
         Items.ACACIA_DOOR,
         Items.SPRUCE_DOOR,
         Items.WARPED_DOOR,
-        Items.COPPER_DOOR,
+        copperDoor("copper_door"),
         Items.CRIMSON_DOOR,
         Items.MANGROVE_DOOR,
         Items.DARK_OAK_DOOR,
-        Items.EXPOSED_COPPER_DOOR,
-        Items.OXIDIZED_COPPER_DOOR,
-        Items.WEATHERED_COPPER_DOOR
+        copperDoor("exposed_copper_door"),
+        copperDoor("oxidized_copper_door"),
+        copperDoor("weathered_copper_door")
     };
+
+    // Copper variants were merged into collections in 26.2, so look these up by id.
+    private static Item copperDoor(String id) {
+        return BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(id));
+    }
 
     private static final Item[] menuIcons = {
         Items.CAKE,
@@ -181,14 +189,14 @@ public class StardustUtil {
         Items.KNOWLEDGE_BOOK,
         Items.FIREWORK_ROCKET,
         Items.TOTEM_OF_UNDYING,
-        Items.LIME_SHULKER_BOX,
+        Items.DYED_SHULKER_BOX.lime(),
         Items.AMETHYST_CLUSTER,
         Items.FLOWERING_AZALEA,
-        Items.PINK_SHULKER_BOX,
+        Items.DYED_SHULKER_BOX.pink(),
         Items.GILDED_BLACKSTONE,
         Items.OMINOUS_TRIAL_KEY,
         Items.HEART_POTTERY_SHERD,
-        Items.LIGHT_BLUE_SHULKER_BOX,
+        Items.DYED_SHULKER_BOX.lightBlue(),
         Items.ENCHANTED_GOLDEN_APPLE,
         Items.HEARTBREAK_POTTERY_SHERD,
         Items.EYE_ARMOR_TRIM_SMITHING_TEMPLATE
@@ -201,13 +209,13 @@ public class StardustUtil {
 
         ItemStack[] enchantedGlass = new ItemStack[] {
             Items.GLASS.getDefaultInstance(),
-            Items.RED_STAINED_GLASS.getDefaultInstance(),
-            Items.CYAN_STAINED_GLASS.getDefaultInstance(),
-            Items.LIME_STAINED_GLASS.getDefaultInstance(),
-            Items.PINK_STAINED_GLASS.getDefaultInstance(),
-            Items.WHITE_STAINED_GLASS.getDefaultInstance(),
-            Items.BLACK_STAINED_GLASS.getDefaultInstance(),
-            Items.LIGHT_BLUE_STAINED_GLASS.getDefaultInstance(),
+            Blocks.STAINED_GLASS.red().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.cyan().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.lime().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.pink().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.white().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.black().asItem().getDefaultInstance(),
+            Blocks.STAINED_GLASS.lightBlue().asItem().getDefaultInstance(),
         };
 
         for (ItemStack g : enchantedGlass) {
@@ -298,7 +306,7 @@ public class StardustUtil {
                 "§",
                 Instant.now(),
                 Crypt.SaltSupplier.getLong(),
-                null,
+                Optional.empty(),
                 ((ClientPacketListenerAccessor) mc.getConnection()).meteor$getLastSeenMessages().generateAndApplyUpdate().update()
             );
             case Interact -> illegalPacket = new ServerboundInteractPacket(mc.player.getId(), InteractionHand.MAIN_HAND, null, false);

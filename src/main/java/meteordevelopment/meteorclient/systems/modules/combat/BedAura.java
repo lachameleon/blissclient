@@ -26,13 +26,11 @@ import meteordevelopment.meteorclient.utils.world.CardinalDirection;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BedItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
-import net.minecraft.world.level.block.entity.BedBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -227,7 +225,7 @@ public class BedAura extends Module {
 
         // Auto move
         if (autoMove.get()) {
-            FindItemResult bed = InvUtils.find(itemStack -> itemStack.getItem() instanceof BedItem);
+            FindItemResult bed = InvUtils.find(itemStack -> itemStack.is(ItemTags.BEDS));
 
             if (bed.found() && bed.slot() != autoMoveSlot.get() - 1) {
                 InvUtils.move().from(bed.slot()).toHotbar(autoMoveSlot.get() - 1);
@@ -250,7 +248,7 @@ public class BedAura extends Module {
     }
 
     private BlockPos findPlace(Player target) {
-        if (!InvUtils.find(itemStack -> itemStack.getItem() instanceof BedItem).found()) return null;
+        if (!InvUtils.find(itemStack -> itemStack.is(ItemTags.BEDS)).found()) return null;
 
         for (int index = 0; index < 3; index++) {
             int i = index == 0 ? 1 : index == 1 ? 0 : 2;
@@ -281,10 +279,12 @@ public class BedAura extends Module {
     }
 
     private BlockPos findBreak() {
-        for (BlockEntity blockEntity : Utils.blockEntities()) {
-            if (!(blockEntity instanceof BedBlockEntity)) continue;
+        BlockPos targetPos = target.blockPosition();
+        int range = (int) Math.ceil(targetRange.get());
 
-            BlockPos bedPos = blockEntity.getBlockPos();
+        for (BlockPos bedPos : BlockPos.betweenClosed(targetPos.offset(-range, -range, -range), targetPos.offset(range, range, range))) {
+            if (!(mc.level.getBlockState(bedPos).getBlock() instanceof BedBlock)) continue;
+
             Vec3 bedVec = Utils.vec3(bedPos);
 
             if (PlayerUtils.isWithinReach(bedVec)
@@ -301,7 +301,7 @@ public class BedAura extends Module {
     private boolean placeBed(BlockPos pos) {
         if (pos == null) return false;
 
-        FindItemResult bed = InvUtils.findInHotbar(itemStack -> itemStack.getItem() instanceof BedItem);
+        FindItemResult bed = InvUtils.findInHotbar(itemStack -> itemStack.is(ItemTags.BEDS));
         if (bed.getHand() == null && !autoSwitch.get()) return false;
 
         double yaw = switch (direction) {

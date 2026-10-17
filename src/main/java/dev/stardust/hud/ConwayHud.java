@@ -439,10 +439,10 @@ public class ConwayHud extends HudElement {
         if (!isVisible) return true;
         switch (visibility.get()) {
             case Widgets -> {
-                if (!(mc.screen instanceof WidgetScreen)) return true;
+                if (!(mc.gui.screen() instanceof WidgetScreen)) return true;
             }
             case Windows -> {
-                if (mc.screen == null) return true;
+                if (mc.gui.screen() == null) return true;
             }
         }
 

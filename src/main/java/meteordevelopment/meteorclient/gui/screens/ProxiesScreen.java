@@ -21,13 +21,12 @@ import meteordevelopment.meteorclient.systems.proxies.Proxies;
 import meteordevelopment.meteorclient.systems.proxies.Proxy;
 import meteordevelopment.meteorclient.utils.misc.NbtUtils;
 import meteordevelopment.meteorclient.utils.network.MeteorExecutor;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.PointerBuffer;
+import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDL_DialogFileFilter;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,24 +56,26 @@ public class ProxiesScreen extends WindowScreen {
 
         // New
         WButton newBtn = l.add(theme.button("New")).expandX().widget();
-        newBtn.action = () -> mc.setScreen(new EditProxyScreen(theme, null, this::reload));
+        newBtn.action = () -> mc.gui.setScreen(new EditProxyScreen(theme, null, this::reload));
 
         // Import
-        PointerBuffer filters = BufferUtils.createPointerBuffer(1);
-
-        ByteBuffer txtFilter = MemoryUtil.memASCII("*.txt");
-
-        filters.put(txtFilter);
-        filters.rewind();
+        MemoryStack stack = MemoryStack.stackPush();
+        SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.malloc(1, stack);
+        filters.name(stack.UTF8("Txt Files")).pattern(stack.UTF8("txt"));
 
         WButton importBtn = l.add(theme.button("Import")).expandX().widget();
-        importBtn.action = () -> {
-            String selectedFile = TinyFileDialogs.tinyfd_openFileDialog("Import Proxies", null, filters, null, false);
-            if (selectedFile != null) {
+        importBtn.action = () -> SDLDialog.SDL_ShowOpenFileDialog((_, fileptr, _) -> {
+            if (fileptr == 0) return;
+
+            long filePointer = MemoryUtil.memGetAddress(fileptr);
+            if (filePointer == 0) return;
+
+            String selectedFile = MemoryUtil.memUTF8(filePointer);
+            if (!selectedFile.isEmpty()){
                 File file = new File(selectedFile);
-                mc.setScreen(new ProxiesImportScreen(theme, file));
+                mc.gui.setScreen(new ProxiesImportScreen(theme, file));
             }
-        };
+        }, 0L, 0, filters, "", false);
 
         l.add(refreshButton).expandX();
         refreshButton.action = () -> Proxies.get().checkProxies(true);
@@ -87,7 +88,7 @@ public class ProxiesScreen extends WindowScreen {
         };
 
         WButton configButton = l.add(theme.button(GuiRenderer.EDIT)).widget();
-        configButton.action = () -> mc.setScreen(new ConfigScreen(theme));
+        configButton.action = () -> mc.gui.setScreen(new ConfigScreen(theme));
         configButton.tooltip = "Proxies Config";
     }
 
@@ -130,7 +131,7 @@ public class ProxiesScreen extends WindowScreen {
             refresh.tooltip = "Refresh";
 
             WButton edit = table.add(theme.button(GuiRenderer.EDIT)).widget();
-            edit.action = () -> mc.setScreen(new EditProxyScreen(theme, proxy, this::reload));
+            edit.action = () -> mc.gui.setScreen(new EditProxyScreen(theme, proxy, this::reload));
 
             WMinus remove = table.add(theme.minus()).widget();
             remove.action = () -> {

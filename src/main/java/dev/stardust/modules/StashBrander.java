@@ -168,12 +168,12 @@ public class StashBrander extends Module {
     @EventHandler
     private void onTick(TickEvent.Post event) {
         if (mc.player == null) return;
-        if (mc.screen == null) {
+        if (mc.gui.screen() == null) {
             notified = false;
             return;
         }
         if (mc.getConnection() == null) return;
-        if (!(mc.screen instanceof AnvilScreen anvilScreen)) return;
+        if (!(mc.gui.screen() instanceof AnvilScreen anvilScreen)) return;
         if (!(mc.player.containerMenu instanceof AnvilMenu anvil)) return;
 
         if (timer < tickRate.get()) {

@@ -23,7 +23,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.projectile.EyeOfEnder;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -33,7 +33,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -78,7 +78,7 @@ public class LocateCommand extends Command {
             ItemStack stack = mc.player.getInventory().getSelectedItem();
             if (stack.getItem() != Items.FILLED_MAP
                 || stack.get(DataComponents.ITEM_NAME) == null
-                || !stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("filled_map.buried_treasure").getString())) {
+                || !stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("item.minecraft.buried_treasure_map").getString())) {
                 error("You need to hold a (highlight)buried treasure map(default)!");
                 return SINGLE_SUCCESS;
             }
@@ -108,8 +108,8 @@ public class LocateCommand extends Command {
             ItemStack stack = mc.player.getInventory().getSelectedItem();
             if (stack.getItem() != Items.FILLED_MAP
                 || stack.get(DataComponents.ITEM_NAME) == null
-                || !stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("filled_map.mansion").getString())) {
-                error("You need to hold a (highlight)woodland explorer map(default)!");
+                || !stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("item.minecraft.woodland_mansion_map").getString())) {
+                error("You need to hold a (highlight)woodland mansion map(default)!");
                 return SINGLE_SUCCESS;
             }
 
@@ -138,7 +138,7 @@ public class LocateCommand extends Command {
             ItemStack stack = mc.player.getInventory().getSelectedItem();
             if (stack.getItem() == Items.FILLED_MAP
                 && stack.get(DataComponents.ITEM_NAME) != null
-                && stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("filled_map.monument").getString())) {
+                && stack.get(DataComponents.ITEM_NAME).getString().equals(Component.translatable("item.minecraft.ocean_monument_map").getString())) {
 
                 MapDecorations mapDecorationsComponent = stack.get(DataComponents.MAP_DECORATIONS);
                 if (mapDecorationsComponent == null) {
@@ -165,7 +165,7 @@ public class LocateCommand extends Command {
             if (BaritoneUtils.IS_AVAILABLE) {
                 Vec3 coords = findByBlockList(monumentBlocks);
                 if (coords == null) {
-                    error("No monument found. Try using an (highlight)ocean explorer map(default) for more success.");
+                    error("No monument found. Try using an (highlight)ocean monument map(default) for more success.");
                     return SINGLE_SUCCESS;
                 }
                 MutableComponent text = Component.literal("Monument located at ");
@@ -175,7 +175,7 @@ public class LocateCommand extends Command {
                 return SINGLE_SUCCESS;
             }
 
-            error("Locating this structure without an (highlight)ocean explorer map(default) requires Baritone.");
+            error("Locating this structure without an (highlight)ocean monument map(default) requires Baritone.");
             return SINGLE_SUCCESS;
         }));
 
@@ -313,7 +313,7 @@ public class LocateCommand extends Command {
 
     @EventHandler
     private void onReadPacket(PacketEvent.Receive event) {
-        if (event.packet instanceof ClientboundAddEntityPacket packet && packet.getType() == EntityType.EYE_OF_ENDER) {
+        if (event.packet instanceof ClientboundAddEntityPacket packet && packet.getType() == EntityTypes.EYE_OF_ENDER) {
             firstPosition(packet.getX(), packet.getY(), packet.getZ());
         }
     }

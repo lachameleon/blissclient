@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.ArrayDeque;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import dev.stardust.util.MsgUtil;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.TimeUnit;
 import dev.stardust.util.StardustUtil;
 import dev.stardust.config.StardustConfig;
@@ -16,7 +16,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -530,7 +530,7 @@ public class RoadTrip extends Module {
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onEntityAddHighPriority(EntityAddedEvent event) {
         if (mc.player == null || mc.level == null) return;
-        if (!antiTrapAutoLog.get() || event.entity.getType() != EntityType.TNT_MINECART) return;
+        if (!antiTrapAutoLog.get() || event.entity.getType() != EntityTypes.TNT_MINECART) return;
         doForceKick(Component.literal("§8[§aRoadTrip§8] §c§oDisconnected you to avoid a trap§8§o! §8§o(§c§oTNT minecarts §7§owere rendered§c§o!§8§o)"));
     }
 

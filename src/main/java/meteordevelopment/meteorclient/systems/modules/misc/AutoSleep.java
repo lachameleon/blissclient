@@ -12,6 +12,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import java.util.Objects;
 
 public class AutoSleep extends Module {
@@ -131,7 +132,7 @@ public class AutoSleep extends Module {
         for (BlockPos blockPos : BlockPos.betweenClosed(mc.player.blockPosition().offset(-radius, -radius, -radius), mc.player.blockPosition().offset(radius, radius, radius))) {
             if (mc.level.getBlockState(blockPos).getBlock() instanceof BedBlock) {
                 sleepTimer = 0;
-                BlockUtils.interact(new BlockHitResult(blockPos.getCenter(), Direction.UP, blockPos, false), InteractionHand.MAIN_HAND, false);
+                BlockUtils.interact(new BlockHitResult(Vec3.atCenterOf(blockPos), Direction.UP, blockPos, false), InteractionHand.MAIN_HAND, false);
                 return true;
             }
         }

@@ -15,11 +15,11 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.entity.Target;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Enderman;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 public class EndermanLook extends Module {
@@ -47,21 +47,21 @@ public class EndermanLook extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         // if either are true nothing happens when you look at an enderman
-        if (mc.player.getItemBySlot(EquipmentSlot.HEAD).is(Blocks.CARVED_PUMPKIN.asItem()) || mc.player.getAbilities().instabuild)
+        if (mc.player.getItemBySlot(EquipmentSlot.HEAD).is(ItemTags.GAZE_DISGUISE_EQUIPMENT) || mc.player.getAbilities().instabuild)
             return;
 
         for (Entity entity : mc.level.entitiesForRendering()) {
-            if (!(entity instanceof EnderMan enderman) || !enderman.isAlive() || !mc.player.hasLineOfSight(enderman))
+            if (!(entity instanceof Enderman enderman) || !enderman.isAlive() || !mc.player.hasLineOfSight(enderman))
                 continue;
 
             switch (lookMode.get()) {
                 case Away -> {
-                    if (enderman.isAngry() && stun.get())
+                    if (enderman.isCreepy() && stun.get())
                         Rotations.rotate(Rotations.getYaw(enderman), Rotations.getPitch(enderman, Target.Head), -75, null);
                     else if (angleCheck(enderman)) Rotations.rotate(mc.player.getYRot(), 90, -75, null);
                 }
                 case At -> {
-                    if (!enderman.isAngry())
+                    if (!enderman.isCreepy())
                         Rotations.rotate(Rotations.getYaw(enderman), Rotations.getPitch(enderman, Target.Head), -75, null);
                 }
             }
@@ -69,9 +69,9 @@ public class EndermanLook extends Module {
     }
 
     /**
-     * @see EnderMan#isBeingStaredBy(Player)
+     * @see Enderman#isBeingStaredBy(Player)
      */
-    private boolean angleCheck(EnderMan entity) {
+    private boolean angleCheck(Enderman entity) {
         Vec3 vec3d = mc.player.getViewVector(1.0F).normalize();
         Vec3 vec3d2 = new Vec3(entity.getX() - mc.player.getX(), entity.getEyeY() - mc.player.getEyeY(), entity.getZ() - mc.player.getZ());
 

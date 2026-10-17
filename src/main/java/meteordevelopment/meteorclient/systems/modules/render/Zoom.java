@@ -6,7 +6,6 @@
 package meteordevelopment.meteorclient.systems.modules.render;
 
 import meteordevelopment.meteorclient.MeteorClient;
-import meteordevelopment.meteorclient.events.meteor.KeyInputEvent;
 import meteordevelopment.meteorclient.events.meteor.MouseScrollEvent;
 import meteordevelopment.meteorclient.events.render.GetFovEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
@@ -19,7 +18,6 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.util.Mth;
-import org.lwjgl.glfw.GLFW;
 
 public class Zoom extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -73,10 +71,7 @@ public class Zoom extends Module {
     private boolean preCinematic;
     private double preMouseSensitivity;
     private double value;
-    private double lastFov;
     private double time;
-
-    private boolean hudManualToggled;
 
     public Zoom() {
         super(Categories.Render, "zoom", "Zooms your view.");
@@ -85,41 +80,20 @@ public class Zoom extends Module {
 
     @Override
     public void onActivate() {
-        if (!enabled) {
-            preCinematic = mc.options.smoothCamera;
-            preMouseSensitivity = mc.options.sensitivity().get();
-            value = zoom.get();
-            lastFov = mc.options.fov().get();
-            time = 0.001;
+        if (enabled) return;
 
-            MeteorClient.EVENT_BUS.subscribe(this);
-            enabled = true;
-        }
+        preCinematic = mc.options.smoothCamera;
+        preMouseSensitivity = mc.options.sensitivity().get();
+        value = zoom.get();
+        time = 0.001;
 
-        if (hideHud.get() && !mc.options.hideGui) {
-            hudManualToggled = false;
-            mc.options.hideGui = true;
-        }
-    }
-
-    @Override
-    public void onDeactivate() {
-        if (hideHud.get() && !hudManualToggled) {
-            mc.options.hideGui = false;
-        }
-    }
-
-    @EventHandler
-    public void onKeyPressed(KeyInputEvent event) {
-        if (event.key() != GLFW.GLFW_KEY_F1) return;
-        hudManualToggled = true;
+        MeteorClient.EVENT_BUS.subscribe(this);
+        enabled = true;
     }
 
     public void onStop() {
         mc.options.smoothCamera = preCinematic;
         mc.options.sensitivity().set(preMouseSensitivity);
-
-        mc.levelRenderer.needsUpdate();
     }
 
     @EventHandler
@@ -140,12 +114,11 @@ public class Zoom extends Module {
 
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
-        if (mc.screen != null) return;
+        if (mc.gui.screen() != null) return;
 
         if (scrollSensitivity.get() > 0 && isActive()) {
             value += event.value * 0.25 * (scrollSensitivity.get() * value);
-            if (value < 1) value = 1;
-
+            value = Math.max(value, 1);
             event.cancel();
         }
     }
@@ -166,9 +139,6 @@ public class Zoom extends Module {
     @EventHandler
     private void onGetFov(GetFovEvent event) {
         event.fov /= (float) getScaling();
-
-        if (lastFov != event.fov) mc.levelRenderer.needsUpdate();
-        lastFov = event.fov;
     }
 
     public double getScaling() {
@@ -178,5 +148,9 @@ public class Zoom extends Module {
 
     public boolean renderHands() {
         return !isActive() || renderHands.get();
+    }
+
+    public boolean shouldHideHud() {
+        return isActive() && hideHud.get();
     }
 }
